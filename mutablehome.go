@@ -21,32 +21,32 @@ import (
 // TYPES
 
 type DeviceType uint64
-type PairStatus uint8
+type PairStatusType uint8
 
 type Device struct {
 	// Type of device (manufacturer, protocol)
-	Type DeviceType
+	Type DeviceType `json:"type"`
 
 	// Unique device identifier
-	DeviceId uint64
+	DeviceId uint64 `json:"id"`
 
 	// Per-product identifier
-	ProductId uint64
+	ProductId uint64 `json:"product"`
 
 	// Name of the device (user-editable)
-	Name string
+	Name string `json:"name"`
 
 	// Location of the device (user-editable)
-	Location string
+	Location string `json:"location"`
 
 	// Status of the device
-	Paired PairStatus
+	PairStatus PairStatusType `json:"status"`
 
 	// Timestamps
-	TimeDiscovered time.Time
-	TimeUnpaired   time.Time
-	TimePaired     time.Time
-	TimeUpdated    time.Time
+	TimeDiscovered time.Time `json:"discovered_timestamp,omitempty"`
+	TimeUnpaired   time.Time `json:"unpaired_timestamp,omitempty"`
+	TimePaired     time.Time `json:"paired_timestamp,omitempty"`
+	TimeUpdated    time.Time `json:"updated_timestamp,omitempty"`
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -55,31 +55,35 @@ type Device struct {
 type Devices interface {
 	gopi.Driver
 
-	// Return Hashkey for a device or empty string
-	//HashForDevice(*Device) string
-
 	// Return an existing device (or create a new device)
 	Device(device_id uint64, device_type DeviceType, product_id uint64) (*Device, error)
+
+	// Return a list of all devices
+	Devices(device_type_flag DeviceType, pair_status_flag PairStatusType) []*Device
+
+	// Pair and Unpair
+	Pair(device_id uint64, device_type DeviceType) error
+	Unpair(device_id uint64, device_type DeviceType) error
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // CONSTANTS
 
 const (
-	DEVICE_TYPE_NONE              DeviceType = 0x00
 	DEVICE_TYPE_ENERGENIE_CONTROL DeviceType = (1 << iota)
-	DEVICE_TYPE_ENERGENIE_MONITOR DeviceType = (1 << iota)
-	DEVICE_TYPE_ANY               DeviceType = (1 << iota) - 1
-	DEVICE_TYPE_MAX               DeviceType = DEVICE_TYPE_ENERGENIE_MONITOR
+	DEVICE_TYPE_ENERGENIE_MONITOR
+	DEVICE_TYPE_MAX             = DEVICE_TYPE_ENERGENIE_MONITOR
+	DEVICE_TYPE_ANY             = DEVICE_TYPE_MAX<<1 - 1
+	DEVICE_TYPE_NONE DeviceType = 0x00
 )
 
 const (
-	PAIR_STATUS_NONE       PairStatus = 0x00
-	PAIR_STATUS_DISCOVERED PairStatus = (1 << iota)
-	PAIR_STATUS_UNPAIRED   PairStatus = (1 << iota)
-	PAIR_STATUS_PAIRED     PairStatus = (1 << iota)
-	PAIR_STATUS_ANY        PairStatus = (1 << iota) - 1
-	PAIR_STATUS_MAX        PairStatus = PAIR_STATUS_PAIRED
+	PAIR_STATUS_DISCOVERED PairStatusType = (1 << iota)
+	PAIR_STATUS_UNPAIRED
+	PAIR_STATUS_PAIRED
+	PAIR_STATUS_MAX                 = PAIR_STATUS_PAIRED
+	PAIR_STATUS_ANY                 = PAIR_STATUS_MAX<<1 - 1
+	PAIR_STATUS_NONE PairStatusType = 0x00
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -93,11 +97,25 @@ func (t DeviceType) String() string {
 	case DEVICE_TYPE_ANY:
 		return "DEVICE_TYPE_ANY"
 	}
-	// TODO
-	return "DEVICE_TYPE_OTHER"
+	// Now individual cases
+	flags := ""
+	for f := DeviceType(1); f <= DEVICE_TYPE_MAX; f <<= 1 {
+		if t&f == 0 {
+			continue
+		}
+		switch f {
+		case DEVICE_TYPE_ENERGENIE_CONTROL:
+			flags = flags + ",DEVICE_TYPE_ENERGENIE_CONTROL"
+		case DEVICE_TYPE_ENERGENIE_MONITOR:
+			flags = flags + ",DEVICE_TYPE_ENERGENIE_MONITOR"
+		default:
+			flags = flags + "[?? Invalid DeviceType]"
+		}
+	}
+	return flags[1:]
 }
 
-func (s PairStatus) String() string {
+func (s PairStatusType) String() string {
 	// None and Any cases
 	switch s {
 	case PAIR_STATUS_NONE:
@@ -105,8 +123,28 @@ func (s PairStatus) String() string {
 	case PAIR_STATUS_ANY:
 		return "PAIR_STATUS_ANY"
 	}
-	// TODO
-	return "PAIR_STATUS_OTHER"
+	// Now individual cases
+	flags := ""
+	for f := PairStatusType(1); f <= PAIR_STATUS_MAX; f <<= 1 {
+		if s&f == 0 {
+			continue
+		}
+		switch f {
+		case PAIR_STATUS_DISCOVERED:
+			flags = flags + ",PAIR_STATUS_DISCOVERED"
+		case PAIR_STATUS_UNPAIRED:
+			flags = flags + ",PAIR_STATUS_UNPAIRED"
+		case PAIR_STATUS_PAIRED:
+			flags = flags + ",PAIR_STATUS_PAIRED"
+		default:
+			flags = flags + "[?? Invalid PairStatusType]"
+		}
+	}
+	return flags[1:]
+}
+
+func (device *Device) Hash() string {
+	return Hash(device.Type, device.DeviceId)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
