@@ -10,14 +10,17 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	// Frameworks
 	"github.com/djthorpe/gopi"
+	"github.com/djthorpe/mutablehome"
 
 	// Modules
 	_ "github.com/djthorpe/gopi/sys/logger"
 	_ "github.com/djthorpe/gopi/sys/rpc/mdns"
+	_ "github.com/djthorpe/mutablehome/sys/rpc"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -102,6 +105,11 @@ FOR_LOOP:
 }
 
 func ConnectLoop(app *gopi.AppInstance, done <-chan struct{}) error {
+
+	// Subscribe to events from the client pool
+	//clientpool := app.ModuleInstance("rpc/clientpool").(mutablehome.RPCClientPool)
+	//pool_events := clientpool.Subscribe()
+
 FOR_LOOP:
 	for {
 		select {
@@ -115,14 +123,34 @@ FOR_LOOP:
 			} else if err := Connect(app, service); err != nil {
 				app.Logger.Error("Connect: %v: %v", service.Name, err)
 			}
+			/*case evt := <-pool_events:
+			if evt == nil {
+				continue
+			} else {
+				app.Logger.Info("Event: %v", evt)
+			}*/
 		}
 	}
 
+	// Unsubscribe from events from the client pool
+	//clientpool.Unsubscribe(pool_events)
+
+	// Return success
 	return nil
 }
 
 func Connect(app *gopi.AppInstance, service *gopi.RPCServiceRecord) error {
-	return gopi.ErrNotImplemented
+
+	// Start the connection process for a remote service
+	clientpool := app.ModuleInstance("rpc/clientpool").(mutablehome.RPCClientPool)
+	if client, err := clientpool.Connect(service, gopi.RPC_FLAG_NONE); err != nil {
+		return err
+	} else {
+		// Immediately disconnect!
+		fmt.Println("Connected: %v", client)
+		defer client.Disconnect()
+		return nil
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -152,7 +180,7 @@ func Main(app *gopi.AppInstance, done chan<- struct{}) error {
 
 func main() {
 	// Create the configuration
-	config := gopi.NewAppConfig("rpc/discovery")
+	config := gopi.NewAppConfig("rpc/discovery", "rpc/clientpool")
 
 	// Run the command line tool
 	os.Exit(gopi.CommandLineTool(config, Main, DiscoveryLoop, ConnectLoop))

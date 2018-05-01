@@ -66,6 +66,23 @@ type Devices interface {
 	Unpair(device_id uint64, device_type DeviceType) error
 }
 
+type RPCClientPool interface {
+	gopi.Driver
+	gopi.Publisher
+
+	Connect(service *gopi.RPCServiceRecord, flags gopi.RPCFlag) (RPCClientConn, error)
+	Disconnect(RPCClientConn) error
+}
+
+type RPCClientConn interface {
+	gopi.Driver
+	gopi.Publisher
+
+	// Connection and disconnection
+	Connect() error
+	Disconnect() error
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // CONSTANTS
 
