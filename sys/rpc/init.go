@@ -24,11 +24,14 @@ func init() {
 		Type: gopi.MODULE_TYPE_OTHER,
 		Config: func(config *gopi.AppConfig) {
 			config.AppFlags.FlagBool("rpc.insecure", true, "Allow insecure SSL connections")
+			config.AppFlags.FlagDuration("rpc.timeout", 0, "Connection timeout")
 		},
 		New: func(app *gopi.AppInstance) (gopi.Driver, error) {
 			insecure, _ := app.AppFlags.GetBool("rpc.insecure")
+			timeout, _ := app.AppFlags.GetDuration("rpc.timeout")
 			return gopi.Open(ClientPool{
 				SkipVerify: insecure,
+				Timeout:    timeout,
 			}, app.Logger)
 		},
 	})

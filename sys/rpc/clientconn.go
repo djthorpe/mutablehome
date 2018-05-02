@@ -10,19 +10,30 @@
 package rpc
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"time"
+
+	"github.com/djthorpe/mutablehome"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi"
 	evt "github.com/djthorpe/gopi/util/event"
 	grpc "google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
+	credentials "google.golang.org/grpc/credentials"
+	reflection_pb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
 // TYPES
+
+type GRPCClientConn interface {
+	mutablehome.RPCClientConn
+
+	// Return the GRPC Connection
+	Conn() *grpc.ClientConn
+}
 
 type ClientConn struct {
 	Name       string
@@ -141,6 +152,39 @@ func (this *clientconn) Disconnect() error {
 	return nil
 }
 
+func (this *clientconn) Services() ([]string, error) {
+	this.log.Debug2("<rpc.clientconn>Services{}")
+	if this.conn == nil {
+		return nil, gopi.ErrOutOfOrder
+	}
+	reflection, err := this.newServerReflectionClient()
+	if err != nil {
+		return nil, err
+	}
+	defer reflection.CloseSend()
+	if services, err := this.listServices(reflection); err != nil {
+		return nil, err
+	} else {
+		return services, nil
+	}
+}
+
+func (this *clientconn) Name() string {
+	return this.name
+}
+
+func (this *clientconn) Addr() string {
+	return this.addr
+}
+
+func (this *clientconn) Connected() bool {
+	return this.conn != nil
+}
+
+func (this *clientconn) Conn() *grpc.ClientConn {
+	return this.conn
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // SUBSCRIBE AND UNSUBSCRIBE
 
@@ -161,4 +205,43 @@ func (this *clientconn) emit(evt gopi.RPCEvent) {
 
 func (this *clientconn) String() string {
 	return fmt.Sprintf("<rpc.ClientConn>{ name=%v addr=%v ssl=%v connected=%v }", this.name, this.addr, this.ssl, this.conn != nil)
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// PRIVATE METHODS
+
+func (this *clientconn) newServerReflectionClient() (reflection_pb.ServerReflection_ServerReflectionInfoClient, error) {
+	if this.conn == nil {
+		return nil, gopi.ErrOutOfOrder
+	}
+	ctx := context.Background()
+	if this.timeout > 0 {
+		ctx, _ = context.WithTimeout(ctx, this.timeout)
+	}
+	if client, err := reflection_pb.NewServerReflectionClient(this.conn).ServerReflectionInfo(ctx); err != nil {
+		return nil, err
+	} else {
+		return client, nil
+	}
+}
+
+func (this *clientconn) listServices(c reflection_pb.ServerReflection_ServerReflectionInfoClient) ([]string, error) {
+	if err := c.Send(&reflection_pb.ServerReflectionRequest{
+		MessageRequest: &reflection_pb.ServerReflectionRequest_ListServices{},
+	}); err != nil {
+		return nil, err
+	}
+	if resp, err := c.Recv(); err != nil {
+		return nil, err
+	} else if modules := resp.GetListServicesResponse(); modules == nil {
+		return nil, fmt.Errorf("GetListServicesResponse() error")
+	} else {
+		module_services := modules.GetService()
+		module_names := make([]string, len(module_services))
+		for i, service := range module_services {
+			// Full name of a registered service, including its package name
+			module_names[i] = service.Name
+		}
+		return module_names, nil
+	}
 }

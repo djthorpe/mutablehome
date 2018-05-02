@@ -10,6 +10,7 @@
 package mutablehome
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -49,6 +50,9 @@ type Device struct {
 	TimeUpdated    time.Time `json:"updated_timestamp,omitempty"`
 }
 
+// Function to create a new client
+type NewClientFunc func(RPCClientConn) (RPCClient, error)
+
 ////////////////////////////////////////////////////////////////////////////////
 // INTERFACES
 
@@ -72,16 +76,29 @@ type RPCClientPool interface {
 
 	Connect(service *gopi.RPCServiceRecord, flags gopi.RPCFlag) (RPCClientConn, error)
 	Disconnect(RPCClientConn) error
+
+	// Register function to create a client
+	// amd create a new RPC client
+	RegisterClient(string, NewClientFunc) error
+	NewClient(string, RPCClientConn) (RPCClient, error)
 }
 
 type RPCClientConn interface {
 	gopi.Driver
 	gopi.Publisher
 
-	// Connection and disconnection
+	// Connection and disconnection, plus list of available services
 	Connect() error
 	Disconnect() error
+
+	// Properties
+	Name() string
+	Addr() string
+	Connected() bool
+	Services() ([]string, error)
 }
+
+type RPCClient interface{}
 
 ////////////////////////////////////////////////////////////////////////////////
 // CONSTANTS
@@ -101,6 +118,10 @@ const (
 	PAIR_STATUS_MAX                 = PAIR_STATUS_PAIRED
 	PAIR_STATUS_ANY                 = PAIR_STATUS_MAX<<1 - 1
 	PAIR_STATUS_NONE PairStatusType = 0x00
+)
+
+var (
+	ErrServiceNotRegistered = errors.New("Service not registered")
 )
 
 ////////////////////////////////////////////////////////////////////////////////

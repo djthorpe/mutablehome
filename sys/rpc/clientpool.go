@@ -32,6 +32,7 @@ type clientpool struct {
 	skipverify bool
 	timeout    time.Duration
 	merger     evt.EventMerger
+	clients    map[string]mutablehome.NewClientFunc
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -44,6 +45,7 @@ func (config ClientPool) Open(log gopi.Logger) (gopi.Driver, error) {
 	this.skipverify = config.SkipVerify
 	this.timeout = config.Timeout
 	this.merger = evt.NewEventMerger()
+	this.clients = make(map[string]mutablehome.NewClientFunc)
 
 	// Success
 	return this, nil
@@ -55,6 +57,7 @@ func (this *clientpool) Close() error {
 	// Release resources
 	this.merger.Close()
 	this.merger = nil
+	this.clients = nil
 
 	return nil
 }
@@ -90,7 +93,7 @@ func (this *clientpool) Connect(service *gopi.RPCServiceRecord, flags gopi.RPCFl
 			return nil, err
 		}
 
-		// return success
+		// Return success
 		return clientconn, nil
 	}
 }
@@ -98,6 +101,33 @@ func (this *clientpool) Connect(service *gopi.RPCServiceRecord, flags gopi.RPCFl
 func (this *clientpool) Disconnect(conn mutablehome.RPCClientConn) error {
 	this.log.Debug2("<rpc.clientpool>Disconnect{ conn=%v }", conn)
 	return conn.Disconnect()
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// CLIENTS
+
+func (this *clientpool) RegisterClient(service string, callback mutablehome.NewClientFunc) error {
+	this.log.Debug2("<rpc.clientpool>RegisterClient{ service=%v func=%v }", service, callback)
+	if service == "" || callback == nil {
+		return gopi.ErrBadParameter
+	} else if _, exists := this.clients[service]; exists {
+		this.log.Debug("<rpc.clientpool>RegisterClient: Duplicate service: %v", service)
+		return gopi.ErrBadParameter
+	} else {
+		this.clients[service] = callback
+		return nil
+	}
+}
+
+func (this *clientpool) NewClient(service string, conn mutablehome.RPCClientConn) (mutablehome.RPCClient, error) {
+	this.log.Debug2("<rpc.clientpool>NewClient{ service=%v conn=%v }", service, conn)
+
+	// Obtain the module with which to create a new client
+	if callback, exists := this.clients[service]; exists == false {
+		return nil, mutablehome.ErrServiceNotRegistered
+	} else {
+		return callback(conn)
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
