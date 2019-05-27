@@ -22,10 +22,11 @@ func init() {
 	gopi.RegisterModule(gopi.Module{
 		Name:     "rpc/mutablehome:service",
 		Type:     gopi.MODULE_TYPE_SERVICE,
-		Requires: []string{"rpc/server"},
+		Requires: []string{"rpc/server", "discovery"},
 		New: func(app *gopi.AppInstance) (gopi.Driver, error) {
 			return gopi.Open(MutableHome{
-				Server: app.ModuleInstance("rpc/server").(gopi.RPCServer),
+				Server:    app.ModuleInstance("rpc/server").(gopi.RPCServer),
+				Discovery: app.ModuleInstance("discovery").(gopi.RPCServiceDiscovery),
 			}, app.Logger)
 		},
 	})
