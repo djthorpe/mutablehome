@@ -16,13 +16,10 @@ GOFLAGS = -ldflags "-s -w $(GOLDFLAGS)"
 
 all: test install
 
-install: mutablehome-service
+install: ikea-ctrl
 
-protobuf:
-	$(GOGEN) -x ./rpc/...
-
-mutablehome-service: protobuf
-	$(GOINSTALL) $(GOFLAGS) ./cmd/mutablehome-service/...
+ikea-ctrl:
+	$(GOINSTALL) $(GOFLAGS) ./cmd/ikea-ctrl/...
 
 test:  protobuf
 	$(GOTEST) ./...
