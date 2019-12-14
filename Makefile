@@ -14,15 +14,12 @@ GOLDFLAGS += -X $(GOPI).GitHash=$(shell git rev-parse HEAD)
 GOLDFLAGS += -X $(GOPI).GoBuildTime=$(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 GOFLAGS = -ldflags "-s -w $(GOLDFLAGS)" 
 
-all: test install
+PKG_CONFIG_PATH_DARWIN=/usr/local/Cellar/libcoap/4.2.1/lib/pkgconfig
 
-install: ikea-ctrl
+darwin: test-darwin
 
-ikea-ctrl:
-	$(GOINSTALL) $(GOFLAGS) ./cmd/ikea-ctrl/...
-
-test:  protobuf
-	$(GOTEST) ./...
+test-darwin:
+	PKG_CONFIG_PATH=$(PKG_CONFIG_PATH_DARWIN) $(GOTEST) -v ./libcoap2/...
 
 clean: 
 	$(GOCLEAN)
