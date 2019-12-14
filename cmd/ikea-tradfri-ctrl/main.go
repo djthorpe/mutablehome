@@ -8,7 +8,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"time"
@@ -36,29 +35,33 @@ func Main(app *gopi.AppInstance, services []gopi.RPCServiceRecord, done chan<- s
 		return err
 	} else if devices, err := tradfri.Devices(); err != nil {
 		return err
-	} else if groups, err := tradfri.Groups(); err != nil {
-		return err
 	} else {
 		for _, device := range devices {
 			if device, err := tradfri.Device(device); err != nil {
 				return err
+			} else if device.Type() == mutablehome.IKEA_DEVICE_TYPE_LIGHT {
+				fmt.Println(device, device.Lights())
 			} else {
 				fmt.Println(device)
 			}
 		}
-		for _, group := range groups {
-			if group, err := tradfri.Group(group); err != nil {
-				return err
-			} else {
-				fmt.Println(group)
+		/*
+			for _, group := range groups {
+				if group, err := tradfri.Group(group); err != nil {
+					return err
+				} else {
+					fmt.Println(group)
+				}
 			}
-		}
+		*/
+		/*
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+			defer cancel()
+			if err := tradfri.ObserveDevice(ctx, 65537); err != nil {
+				return err
+			}
+		*/
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
-		defer cancel()
-		if err := tradfri.ObserveDevice(ctx, 65539); err != nil {
-			return err
-		}
 		// Success
 		done <- gopi.DONE
 	}

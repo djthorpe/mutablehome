@@ -44,6 +44,13 @@ type IkeaDevice interface {
 	Created() time.Time
 	Updated() time.Time
 	Active() bool
+
+	Lights() []IkeaLight
+}
+
+type IkeaLight interface {
+	Power() bool
+	ColorHex() string
 }
 
 type IkeaGroup interface {
@@ -59,7 +66,7 @@ type IkeaScene interface {
 const (
 	IKEA_DEVICE_TYPE_REMOTE       IkeaDeviceType = 0
 	IKEA_DEVICE_TYPE_SLAVE_REMOTE IkeaDeviceType = 1
-	IKEA_DEVICE_TYPE_LIGHTBULB    IkeaDeviceType = 2
+	IKEA_DEVICE_TYPE_LIGHT        IkeaDeviceType = 2
 	IKEA_DEVICE_TYPE_PLUG         IkeaDeviceType = 3
 	IKEA_DEVICE_TYPE_MOTIONSENSOR IkeaDeviceType = 4
 	IKEA_DEVICE_TYPE_REPEATER     IkeaDeviceType = 6
@@ -72,8 +79,8 @@ func (t IkeaDeviceType) String() string {
 		return "IKEA_DEVICE_TYPE_REMOTE"
 	case IKEA_DEVICE_TYPE_SLAVE_REMOTE:
 		return "IKEA_DEVICE_TYPE_SLAVE_REMOTE"
-	case IKEA_DEVICE_TYPE_LIGHTBULB:
-		return "IKEA_DEVICE_TYPE_LIGHTBULB"
+	case IKEA_DEVICE_TYPE_LIGHT:
+		return "IKEA_DEVICE_TYPE_LIGHT"
 	case IKEA_DEVICE_TYPE_PLUG:
 		return "IKEA_DEVICE_TYPE_PLUG"
 	case IKEA_DEVICE_TYPE_MOTIONSENSOR:

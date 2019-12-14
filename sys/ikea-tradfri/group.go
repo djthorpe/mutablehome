@@ -16,9 +16,10 @@ import (
 // TYPES
 
 type group struct {
-	Id_     uint   `json:"9003"`
-	Name_   string `json:"9001"`
-	Content struct {
+	Id_      uint   `json:"9003"`
+	Name_    string `json:"9001"`
+	Created_ int64  `json:"9002"`
+	Content  struct {
 		Devices struct {
 			Devices []uint `json:"9003"`
 		} `json:"15002"`

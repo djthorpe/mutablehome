@@ -89,14 +89,15 @@ func (config Tradfri) Open(logger gopi.Logger) (gopi.Driver, error) {
 }
 
 func (this *tradfri) Close() error {
-	this.log.Debug("<mutablehome.ikea-tradfri.Close>{}")
+	this.log.Debug("<mutablehome.ikea-tradfri.Close>{ conn=%+v }", this.conn)
 
 	// Close connection
-	if this.conn != nil {
-		if err := this.conn.Close(); err != nil {
-			return err
-		}
-	}
+	// Commented out due to bugs in library method
+	//if this.conn != nil {
+	//	if err := this.conn.Close(); err != nil {
+	//		return err
+	//	}
+	//}
 
 	// Release resources
 	this.conn = nil
@@ -152,7 +153,11 @@ func (this *tradfri) Connect(service gopi.RPCServiceRecord, flags gopi.RPCFlag) 
 }
 
 func (this *tradfri) connectWith(addr, name, key string) (*coap.ClientConn, error) {
-	if conn, err := coap.DialDTLSWithTimeout("udp", addr, &dtls.Config{
+	this.log.Debug2("<mutablehome.ikea-tradfri.ConnectWith>{ addr=%v name=%v key=%v }", strconv.Quote(addr), strconv.Quote(name), strconv.Quote(key))
+
+	if key == "" {
+		return nil, fmt.Errorf("%w: Missing key parameter", gopi.ErrBadParameter)
+	} else if conn, err := coap.DialDTLSWithTimeout("udp", addr, &dtls.Config{
 		PSK: func(hint []byte) ([]byte, error) {
 			return []byte(key), nil
 		},
@@ -238,6 +243,8 @@ func (this *tradfri) Scene(id uint) (mutablehome.IkeaScene, error) {
 }
 
 func (this *tradfri) ObserveDevice(ctx context.Context, id uint) error {
+	this.log.Debug2("<mutablehome.ikea-tradfri.ObserveDevice>{ id=%v }", id)
+
 	path := fmt.Sprintf("%v/%d", PATH_DEVICES, id)
 	if obs, err := this.conn.Observe(path, func(response *coap.Request) {
 		device := &device{}
@@ -253,6 +260,7 @@ func (this *tradfri) ObserveDevice(ctx context.Context, id uint) error {
 	} else {
 		select {
 		case <-ctx.Done():
+			this.log.Debug("ObserveDevice: %v: Cancel", id)
 			if err := obs.Cancel(); err != nil {
 				return err
 			}
@@ -367,7 +375,10 @@ func (this *tradfri) requestObjForPathId(path string, id uint, obj interface{}) 
 		return fmt.Errorf("%w: %v (path: %v)", gopi.ErrUnexpectedResponse, response.Code(), response.Path())
 	} else if err := json.Unmarshal(response.Payload(), obj); err != nil {
 		return fmt.Errorf("%w: %v", err, string(response.Payload()))
+	} else {
+		fmt.Println(string(response.Payload()))
 	}
+
 	// Success
 	return nil
 }
