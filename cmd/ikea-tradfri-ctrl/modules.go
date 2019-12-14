@@ -10,7 +10,7 @@ package main
 import (
 	// Modules
 	_ "github.com/djthorpe/gopi/sys/logger"
-	_ "github.com/djthorpe/mutablehome/sys/ikea"
+	_ "github.com/djthorpe/mutablehome/sys/ikea-tradfri"
 	_ "github.com/djthorpe/gopi-rpc/sys/grpc"
 	_ "github.com/djthorpe/gopi-rpc/sys/dns-sd"
 )
