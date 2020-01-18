@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"os"
 
 	// Frameworks
 	"github.com/djthorpe/gopi/v2"
@@ -23,9 +25,15 @@ func Main(app gopi.App, args []string) error {
 			fmt.Println("Connect:", device)
 			if err := device.Connect(); err != nil {
 				return err
+			} else if err := device.FetchBatteryLevel(); err != nil {
+				return err
 			}
 		}
 	}
+
+	// Wait for CTRL+C
+	fmt.Println("Press CRTL+C to end")
+	app.WaitForSignal(context.Background(), os.Interrupt)
 
 	// Return success
 	return nil

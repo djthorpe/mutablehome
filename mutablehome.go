@@ -32,6 +32,10 @@ type Ecovacs interface {
 
 type EvovacsDevice interface {
 	Connect() error
+	Disconnect() error
+
+	// Fetch information
+	FetchBatteryLevel() error
 }
 
 ////////////////////////////////////////////////////////////////////////////////

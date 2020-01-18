@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi/v2"
@@ -24,6 +25,7 @@ type device struct {
 
 	source *ecovacs
 	client *xmpp.Client
+	stop   chan struct{}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -47,7 +49,7 @@ func (this *device) Connect() error {
 		return gopi.ErrInternalAppError.WithPrefix("country")
 	} else {
 		config := xmpp.Options{
-			Host:     server,
+			Host:     fmt.Sprintf("%s:%d", server, ECOVACS_XMPP_PORT),
 			User:     fmt.Sprintf("%s@%s", this.source.userId, ECOVACS_REALM),
 			Password: fmt.Sprintf("0/%s/%s", this.source.resourceId, this.source.accessToken),
 			NoTLS:    true,
@@ -57,10 +59,27 @@ func (this *device) Connect() error {
 				InsecureSkipVerify: true,
 			},
 		}
+		fmt.Printf("%+v\n", config)
 		if client, err := config.NewClient(); err != nil {
 			return err
 		} else {
 			this.client = client
+			this.stop = make(chan struct{})
+			go this.ping(this.stop)
+			go func() {
+				for {
+					if stanza, err := this.client.Recv(); err != nil {
+						fmt.Println("ERROR", err)
+					} else {
+						switch v := stanza.(type) {
+						case xmpp.Chat:
+							fmt.Println("CHAT", v.Remote, v.Text)
+						case xmpp.Presence:
+							fmt.Println("PRESENCE", v.From, v.Show)
+						}
+					}
+				}
+			}()
 		}
 	}
 
@@ -68,8 +87,22 @@ func (this *device) Connect() error {
 	return nil
 }
 
+func (this *device) Disconnect() error {
+	this.stop <- struct{}{}
+	<-this.stop
+	return nil
+}
+
 func (this *device) Address() string {
 	return fmt.Sprintf("%s@%s.ecorobot.net/atom", this.DeviceId, this.Class)
+}
+
+func (this *device) FetchBatteryLevel() error {
+	if _, err := this.send("1", `<ctl td="Clean"><clean type="auto" speed="standard"/></ctl>`); err != nil {
+		return err
+	} else {
+		return nil
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -98,4 +131,27 @@ func CountryToXMPPServer(country string) string {
 		}
 	}
 	return d
+}
+
+func (this *device) ping(stop chan struct{}) {
+	ticker := time.NewTimer(time.Second)
+FOR_LOOP:
+	for {
+		select {
+		case <-ticker.C:
+			fmt.Println("PING")
+			if err := this.client.PingC2S(this.Address(), this.client.JID()); err != nil {
+				fmt.Println("ERROR", err)
+			}
+			ticker.Reset(30 * time.Second)
+		case <-stop:
+			fmt.Println("STOP")
+			break FOR_LOOP
+		}
+	}
+	close(stop)
+}
+
+func (this *device) send(reqid, command string) (string, error) {
+	return this.client.RawInformationQuery(this.Address(), this.client.JID(), reqid, xmpp.IQTypeSet, "com:ctl", command)
 }

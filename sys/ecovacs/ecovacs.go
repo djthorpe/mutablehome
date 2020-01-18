@@ -37,6 +37,7 @@ type ecovacs struct {
 	client                             *http.Client
 	meta                               url.Values
 	userId, accessToken                string
+	devices                            []mutablehome.EvovacsDevice
 
 	base.Unit
 }
@@ -215,17 +216,12 @@ func (this *ecovacs) Authenticate() error {
 	} else if response, err := this.callUserLogin(token, authCode); err != nil {
 		return err
 	} else {
-		fmt.Printf("AccessToken=>%+v\n", token)
-		fmt.Printf("AuthCode=>%+v\n", authCode)
-		fmt.Printf("LoginResponse=>%+v\n", response)
 		this.accessToken = response.Token
 		if response.UserId != token.Data.UserId {
 			this.userId = response.UserId
 		} else {
 			this.userId = token.Data.UserId
 		}
-		fmt.Printf("accessToken=>%+v\n", this.accessToken)
-		fmt.Printf("userId=>%+v\n", this.userId)
 	}
 
 	// Authentication success
@@ -235,16 +231,22 @@ func (this *ecovacs) Authenticate() error {
 func (this *ecovacs) Devices() ([]mutablehome.EvovacsDevice, error) {
 	if this.userId == "" || this.accessToken == "" {
 		return nil, gopi.ErrInternalAppError
-	} else if devices, err := this.callDevices(); err != nil {
-		return nil, err
-	} else {
-		ret := make([]mutablehome.EvovacsDevice, len(devices))
-		for i, device := range devices {
-			device.source = this
-			ret[i] = device
-		}
-		return ret, nil
+	} else if this.devices == nil {
+		this.devices = make([]mutablehome.EvovacsDevice, 0, 1)
 	}
+
+	if len(this.devices) == 0 {
+		if devices, err := this.callDevices(); err != nil {
+			return nil, err
+		} else {
+			for _, device := range devices {
+				device.source = this
+				this.devices = append(this.devices, device)
+			}
+		}
+	}
+
+	return this.devices, nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////
