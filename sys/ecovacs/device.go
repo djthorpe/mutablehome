@@ -1,15 +1,14 @@
 package ecovacs
 
 import (
+	"crypto/tls"
 	"fmt"
-	"log"
-	"os"
 	"strconv"
 	"strings"
 
 	// Frameworks
-	"github.com/djthorpe/gopi/v2"
-	"gosrc.io/xmpp"
+	gopi "github.com/djthorpe/gopi/v2"
+	xmpp "github.com/mattn/go-xmpp"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -24,6 +23,7 @@ type device struct {
 	Company  string `json:"company"`
 
 	source *ecovacs
+	client *xmpp.Client
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -46,31 +46,30 @@ func (this *device) Connect() error {
 	if server := CountryToXMPPServer(this.source.country); server == "" {
 		return gopi.ErrInternalAppError.WithPrefix("country")
 	} else {
-		config := xmpp.Config{
-			TransportConfiguration: xmpp.TransportConfiguration{
-				Address: fmt.Sprintf("%s:%v", server, ECOVACS_XMPP_PORT),
+		config := xmpp.Options{
+			Host:     server,
+			User:     fmt.Sprintf("%s@%s", this.source.userId, ECOVACS_REALM),
+			Password: fmt.Sprintf("0/%s/%s", this.source.resourceId, this.source.accessToken),
+			NoTLS:    true,
+			Debug:    true,
+			Session:  true,
+			TLSConfig: &tls.Config{
+				InsecureSkipVerify: true,
 			},
-			Jid:          fmt.Sprintf("%s@%s", this.source.userId, ECOVACS_REALM),
-			Credential:   xmpp.Password(fmt.Sprintf("0/%s/%s", this.source.resourceId, this.source.accessToken)),
-			StreamLogger: os.Stdout,
-			Insecure:     true,
 		}
-		router := xmpp.NewRouter()
-		if client, err := xmpp.NewClient(config, router, errorHandler); err != nil {
+		if client, err := config.NewClient(); err != nil {
 			return err
 		} else {
-			cm := xmpp.NewStreamManager(client, nil)
-			log.Fatal(cm.Run())
+			this.client = client
 		}
-
 	}
 
 	// Success
 	return nil
 }
 
-func errorHandler(err error) {
-	fmt.Println(err.Error())
+func (this *device) Address() string {
+	return fmt.Sprintf("%s@%s.ecorobot.net/atom", this.DeviceId, this.Class)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -78,9 +77,8 @@ func errorHandler(err error) {
 
 func (this *device) String() string {
 	return "<ecovacs.device" +
-		" device_id=" + strconv.Quote(this.DeviceId) +
+		" addr=" + strconv.Quote(this.Address()) +
 		" nickname=" + strconv.Quote(this.Nickname) +
-		" company=" + strconv.Quote(this.Company) +
 		">"
 }
 
