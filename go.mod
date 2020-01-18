@@ -11,4 +11,5 @@ require (
 	github.com/olekukonko/tablewriter v0.0.4
 	github.com/pion/dtls/v2 v2.0.0-rc.3
 	golang.org/x/crypto v0.0.0-20191206172530-e9b2fee46413
+	gosrc.io/xmpp v0.4.0
 )

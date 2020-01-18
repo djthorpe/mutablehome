@@ -1,4 +1,4 @@
-package main
+package ecovacs
 
 var (
 	COUNTRY_ALPHA2_TO_CONTINENT_CODE = map[string]string{

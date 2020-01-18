@@ -9,11 +9,33 @@ package mutablehome
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	// Frameworks
-	"github.com/djthorpe/gopi"
+	gopi "github.com/djthorpe/gopi"
+	gopi2 "github.com/djthorpe/gopi/v2"
 )
+
+////////////////////////////////////////////////////////////////////////////////
+// ECOVACS DEEBOT
+
+type Ecovacs interface {
+	gopi2.Unit
+
+	// Authenticate
+	Authenticate() error
+
+	// Devices
+	Devices() ([]EvovacsDevice, error)
+}
+
+type EvovacsDevice interface {
+	Connect() error
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// IKEA TRADFRI
 
 type IkeaDeviceType uint
 
@@ -72,6 +94,16 @@ const (
 	IKEA_DEVICE_TYPE_REPEATER     IkeaDeviceType = 6
 	IKEA_DEVICE_TYPE_BLIND        IkeaDeviceType = 7
 )
+
+////////////////////////////////////////////////////////////////////////////////
+// GLOBALS
+
+var (
+	ErrAuthenticationError = errors.New("Authentication Error")
+)
+
+////////////////////////////////////////////////////////////////////////////////
+// STRINGIFY
 
 func (t IkeaDeviceType) String() string {
 	switch t {
