@@ -17,7 +17,7 @@ import (
 	// Frameworks
 	gopi "github.com/djthorpe/gopi/v2"
 	base "github.com/djthorpe/gopi/v2/base"
-	"github.com/djthorpe/mutablehome"
+	home "github.com/djthorpe/mutablehome"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -27,6 +27,7 @@ type Ecovacs struct {
 	Country      string
 	AccountId    string
 	PasswordHash string
+	Bus          gopi.Bus
 }
 
 type ecovacs struct {
@@ -37,7 +38,8 @@ type ecovacs struct {
 	client                             *http.Client
 	meta                               url.Values
 	userId, accessToken                string
-	devices                            []mutablehome.EvovacsDevice
+	devices                            []home.EvovacsDevice
+	bus                                gopi.Bus
 
 	base.Unit
 }
@@ -113,6 +115,14 @@ func (config Ecovacs) New(log gopi.Logger) (gopi.Unit, error) {
 }
 
 func (this *ecovacs) Init(config Ecovacs) error {
+	// Check bus parameter
+	if config.Bus == nil {
+		return gopi.ErrBadParameter.WithPrefix("Bus")
+	} else {
+		this.bus = config.Bus
+	}
+
+	// Check country, continent and language
 	country := strings.ToUpper(config.Country)
 	if continent, exists := COUNTRY_ALPHA2_TO_CONTINENT_CODE[country]; exists == false {
 		return gopi.ErrBadParameter.WithPrefix("ecovacs.country")
@@ -141,7 +151,7 @@ func (this *ecovacs) Init(config Ecovacs) error {
 		this.passwordHash = passwordHash
 	}
 
-	// Set DeviceId
+	// Set deviceId and resouceId
 	this.deviceId = MD5String(time.Now().String())
 	this.resourceId = this.deviceId[0:8]
 
@@ -171,6 +181,23 @@ func (this *ecovacs) Init(config Ecovacs) error {
 }
 
 func (this *ecovacs) Close() error {
+	// Close devices
+	err := gopi.NewCompoundError()
+	for _, d := range this.devices {
+		err.Add(d.(*device).Disconnect())
+	}
+	if err.ErrorOrSelf() != nil {
+		return err.ErrorOrSelf()
+	}
+
+	// Release resources
+	this.publicKey = nil
+	this.client = nil
+	this.meta = nil
+	this.devices = nil
+	this.bus = nil
+
+	// Return success
 	return this.Unit.Close()
 }
 
@@ -197,7 +224,7 @@ func (this *ecovacs) Authenticate() error {
 	} else if err := json.Unmarshal(response, &token); err != nil {
 		return err
 	} else if token.Code == "1005" {
-		return mutablehome.ErrAuthenticationError
+		return home.ErrAuthenticationError
 	} else if token.Code != "0000" {
 		return gopi.ErrUnexpectedResponse.WithPrefix(token.Code)
 	} else if uri, err := this.mainURL("/user/getAuthCode"); err != nil {
@@ -228,11 +255,11 @@ func (this *ecovacs) Authenticate() error {
 	return nil
 }
 
-func (this *ecovacs) Devices() ([]mutablehome.EvovacsDevice, error) {
+func (this *ecovacs) Devices() ([]home.EvovacsDevice, error) {
 	if this.userId == "" || this.accessToken == "" {
 		return nil, gopi.ErrInternalAppError
 	} else if this.devices == nil {
-		this.devices = make([]mutablehome.EvovacsDevice, 0, 1)
+		this.devices = make([]home.EvovacsDevice, 0, 1)
 	}
 
 	if len(this.devices) == 0 {
@@ -249,6 +276,26 @@ func (this *ecovacs) Devices() ([]mutablehome.EvovacsDevice, error) {
 	return this.devices, nil
 }
 
+// Connect to a device to start reading messages
+func (this *ecovacs) Connect(d home.EvovacsDevice) error {
+	for _, e := range this.devices {
+		if d == e {
+			return d.(*device).Connect()
+		}
+	}
+	return gopi.ErrNotFound.WithPrefix("Connect")
+}
+
+// Disconnect from a device to stop updating
+func (this *ecovacs) Disconnect(d home.EvovacsDevice) error {
+	for _, e := range this.devices {
+		if d == e {
+			return d.(*device).Disconnect()
+		}
+	}
+	return gopi.ErrNotFound.WithPrefix("Disconnect")
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // STRINGIFY
 
@@ -260,6 +307,7 @@ func (this *ecovacs) String() string {
 		" timezone=" + strconv.Quote(this.timezone) +
 		" accountId=" + strconv.Quote(this.accountId) +
 		" passwordHash=" + strconv.Quote(this.passwordHash) +
+		" devices=" + fmt.Sprint(this.Devices()) +
 		">"
 }
 
@@ -441,7 +489,3 @@ func SortedKeys(params url.Values) []string {
 	sort.Strings(keys)
 	return keys
 }
-
-/*
-
- */
