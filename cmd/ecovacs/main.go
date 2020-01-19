@@ -27,41 +27,6 @@ func Main(app gopi.App, args []string) error {
 			if err := ecovacs.Connect(device); err != nil {
 				return err
 			}
-			if _, err := device.GetBatteryInfo(); err != nil {
-				return err
-			} else {
-				time.Sleep(2 * time.Second)
-			}
-			if _, err := device.GetChargeState(); err != nil {
-				return err
-			} else {
-				time.Sleep(2 * time.Second)
-			}
-			if _, err := device.GetCleanState(); err != nil {
-				return err
-			} else {
-				time.Sleep(2 * time.Second)
-			}
-			if _, err := device.GetLifeSpan(mutablehome.ECOVACS_PART_BRUSH); err != nil {
-				return err
-			} else {
-				time.Sleep(2 * time.Second)
-			}
-			if _, err := device.GetLifeSpan(mutablehome.ECOVACS_PART_SIDEBRUSH); err != nil {
-				return err
-			} else {
-				time.Sleep(2 * time.Second)
-			}
-			if _, err := device.GetLifeSpan(mutablehome.ECOVACS_PART_DUSTFILTER); err != nil {
-				return err
-			} else {
-				time.Sleep(2 * time.Second)
-			}
-			if _, err := device.GetVersion(); err != nil {
-				return err
-			} else {
-				time.Sleep(2 * time.Second)
-			}
 			if _, err := device.Clean(mutablehome.ECOVACS_CLEAN_AUTO, mutablehome.ECOVACS_SUCTION_STRONG); err != nil {
 				return err
 			} else {
@@ -72,20 +37,6 @@ func Main(app gopi.App, args []string) error {
 			} else {
 				time.Sleep(2 * time.Second)
 			}
-			/* following commands may not work yet */
-			/*
-
-				if _, err := device.GetLog(); err != nil {
-					return err
-				} else {
-					time.Sleep(2 * time.Second)
-				}
-				if _, err := device.GetTime(); err != nil {
-					return err
-				} else {
-					time.Sleep(2 * time.Second)
-				}
-			*/
 		}
 
 		// Wait for CTRL+C

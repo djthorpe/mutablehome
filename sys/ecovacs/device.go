@@ -70,7 +70,9 @@ type message struct {
 
 const (
 	// Time-to-live for any state
-	DELTA_TTL = 4 * time.Minute
+	DELTA_OTHER_TTL    = 4 * time.Minute
+	DELTA_VERSION_TTL  = 6 * time.Hour
+	DELTA_LIFESPAN_TTL = 2 * time.Hour
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -116,6 +118,8 @@ func (this *device) Connect() error {
 		} else {
 			this.client = client
 			this.stop = make(chan struct{})
+			this.state.RemoveAll()
+
 			this.WaitGroup.Add(2)
 			go this.recv()
 			go this.ping(this.stop)
@@ -142,6 +146,9 @@ func (this *device) Disconnect() error {
 
 	// wait for termination of recv
 	this.WaitGroup.Wait()
+
+	// remove state
+	this.state.RemoveAll()
 
 	// release resources
 	this.client = nil
@@ -317,7 +324,7 @@ func (this *device) recv_parse(reqId string, type_ string, data []byte) error {
 		if evt.Type() == home.ECOVACS_EVENT_NONE {
 			// Emit but don't store NONE events
 			this.source.bus.Emit(evt)
-		} else if modified := this.state.Set(evt, DELTA_TTL); modified {
+		} else if modified := this.state.Set(evt, ttlForType(evt.Type())); modified {
 			// Emit but only if modified
 			this.source.bus.Emit(evt)
 			// Print out the current device state
@@ -367,6 +374,14 @@ func (this *device) ping(stop <-chan struct{}) {
 	defer this.WaitGroup.Done()
 	ping_ticker := time.NewTicker(time.Second * 30)
 	update_ticker := time.NewTicker(time.Second * 15)
+
+	// Add expired keys to ticker
+	this.state.AddExpiredKey(home.ECOVACS_EVENT_BATTERYLEVEL)
+	this.state.AddExpiredKey(home.ECOVACS_EVENT_CHARGESTATE)
+	this.state.AddExpiredKey(home.ECOVACS_EVENT_CLEANSTATE)
+	this.state.AddExpiredKey(home.ECOVACS_EVENT_LIFESPAN)
+	this.state.AddExpiredKey(home.ECOVACS_EVENT_VERSION)
+
 FOR_LOOP:
 	for {
 		select {
@@ -385,6 +400,17 @@ FOR_LOOP:
 			update_ticker.Stop()
 			break FOR_LOOP
 		}
+	}
+}
+
+func ttlForType(type_ home.EcovacsEventType) time.Duration {
+	switch type_ {
+	case home.ECOVACS_EVENT_VERSION:
+		return DELTA_VERSION_TTL
+	case home.ECOVACS_EVENT_LIFESPAN:
+		return DELTA_LIFESPAN_TTL
+	default:
+		return DELTA_OTHER_TTL
 	}
 }
 
