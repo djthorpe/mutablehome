@@ -22,6 +22,7 @@ func Main(app gopi.App, args []string) error {
 	} else if len(devices) == 0 {
 		return errors.New("No ecovacs devices found")
 	} else {
+		// For each device, connect and then clean for 10 seconds then return to charger
 		for _, device := range devices {
 			fmt.Println("Connect:", device)
 			if err := ecovacs.Connect(device); err != nil {
@@ -42,14 +43,6 @@ func Main(app gopi.App, args []string) error {
 		// Wait for CTRL+C
 		fmt.Println("Press CTRL+C to end")
 		app.WaitForSignal(context.Background(), os.Interrupt)
-
-		for _, device := range devices {
-			fmt.Println("Disconnect:", device)
-			if err := ecovacs.Disconnect(device); err != nil {
-				return err
-			}
-		}
-
 	}
 
 	// Return success
