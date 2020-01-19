@@ -118,8 +118,6 @@ func (this *device) Connect() error {
 		} else {
 			this.client = client
 			this.stop = make(chan struct{})
-			this.state.RemoveAll()
-
 			this.WaitGroup.Add(2)
 			go this.recv()
 			go this.ping(this.stop)
@@ -146,9 +144,6 @@ func (this *device) Disconnect() error {
 
 	// wait for termination of recv
 	this.WaitGroup.Wait()
-
-	// remove state
-	this.state.RemoveAll()
 
 	// release resources
 	this.client = nil
@@ -294,10 +289,16 @@ FOR_LOOP:
 		if stanza, err := this.client.Recv(); err != nil {
 			want := "use of closed network connection"
 			if strings.Contains(err.Error(), want) {
-				break FOR_LOOP
+				// Error due to disconnect, don't report
 			} else {
-				fmt.Println("RECV ERROR", err)
+				// Other error should result in disconnect/connect cycle
+				// We need to do this in a goroutine to prevent deadlock
+				go func() {
+					this.source.deviceError(this, err)
+				}()
 			}
+			// Quit the recv loop to prevent further errors
+			break FOR_LOOP
 		} else {
 			switch v := stanza.(type) {
 			case xmpp.IQ:

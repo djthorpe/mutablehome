@@ -280,6 +280,7 @@ func (this *ecovacs) Devices() ([]home.EvovacsDevice, error) {
 func (this *ecovacs) Connect(d home.EvovacsDevice) error {
 	for _, e := range this.devices {
 		if d == e {
+			this.Log.Debug("Connect:", d)
 			return d.(*device).Connect()
 		}
 	}
@@ -290,6 +291,7 @@ func (this *ecovacs) Connect(d home.EvovacsDevice) error {
 func (this *ecovacs) Disconnect(d home.EvovacsDevice) error {
 	for _, e := range this.devices {
 		if d == e {
+			this.Log.Debug("Disconect:", d)
 			return d.(*device).Disconnect()
 		}
 	}
@@ -444,7 +446,6 @@ func (this *ecovacs) callMain(uri *url.URL, params url.Values) (int, []byte, err
 }
 
 func (this *ecovacs) signParams(params url.Values) url.Values {
-
 	// Add values which we need to sign
 	sign := url.Values{}
 	sign.Set("authTimeZone", this.timezone)
@@ -471,6 +472,18 @@ func (this *ecovacs) signParams(params url.Values) url.Values {
 
 	// Return parameters
 	return params
+}
+
+func (this *ecovacs) deviceError(d *device, err error) {
+	this.Log.Error(fmt.Errorf("%v: %w", d.Address(), err))
+
+	// Disconnect and then reconnect when any device error occurs
+	if err := this.Disconnect(d); err != nil {
+		this.Log.Error(fmt.Errorf("%v: %w", d.Address(), err))
+	}
+	if err := this.Connect(d); err != nil {
+		this.Log.Error(fmt.Errorf("%v: %w", d.Address(), err))
+	}
 }
 
 func SortedQuery(params url.Values) string {
