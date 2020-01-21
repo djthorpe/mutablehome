@@ -7,15 +7,15 @@ import (
 	"sync"
 	"time"
 
-	home "github.com/djthorpe/mutablehome"
 	// Frameworks
+	home "github.com/djthorpe/mutablehome"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
 // TYPES
 
-type state struct {
-	values  map[string]*event
+type DeviceState struct {
+	values  map[string]*XMPPMessage
 	expires map[string]time.Time
 	queue   []home.EcovacsEventType
 
@@ -26,7 +26,7 @@ type state struct {
 // PUBLIC METHODS
 
 // Sets a value for key, and returns true if value was added or modified
-func (this *state) Set(value *event, ttl time.Duration) bool {
+func (this *DeviceState) Set(value *XMPPMessage, ttl time.Duration) bool {
 	this.RWMutex.Lock()
 	defer this.RWMutex.Unlock()
 
@@ -36,7 +36,7 @@ func (this *state) Set(value *event, ttl time.Duration) bool {
 	// Add TTL value
 	mapKey := mapKey(value)
 
-	// Check for value modified
+	// Check for modified message
 	modified := true
 	if old, exists := this.values[mapKey]; exists {
 		if time.Now().After(this.expires[mapKey]) {
@@ -57,7 +57,7 @@ func (this *state) Set(value *event, ttl time.Duration) bool {
 }
 
 // Remove all elements from state
-func (this *state) RemoveAll() {
+func (this *DeviceState) RemoveAll() {
 	this.RWMutex.Lock()
 	defer this.RWMutex.Unlock()
 
@@ -67,7 +67,7 @@ func (this *state) RemoveAll() {
 	this.queue = nil
 }
 
-func (this *state) AddExpiredKey(key home.EcovacsEventType) {
+func (this *DeviceState) AddExpiredKey(key home.EcovacsEventType) {
 	this.RWMutex.Lock()
 	defer this.RWMutex.Unlock()
 
@@ -80,11 +80,12 @@ func (this *state) AddExpiredKey(key home.EcovacsEventType) {
 			return
 		}
 	}
+
 	// Append to end
 	this.queue = append(this.queue, key)
 }
 
-func (this *state) NextExpiredKey() home.EcovacsEventType {
+func (this *DeviceState) NextExpiredKey() home.EcovacsEventType {
 	this.RWMutex.RLock()
 	defer this.RWMutex.RUnlock()
 
@@ -121,9 +122,9 @@ func (this *state) NextExpiredKey() home.EcovacsEventType {
 ////////////////////////////////////////////////////////////////////////////////
 // PRIVATE METHODS
 
-func (this *state) init() {
+func (this *DeviceState) init() {
 	if this.values == nil {
-		this.values = make(map[string]*event)
+		this.values = make(map[string]*XMPPMessage)
 	}
 	if this.expires == nil {
 		this.expires = make(map[string]time.Time)
@@ -134,7 +135,7 @@ func (this *state) init() {
 }
 
 // exists returns true if a value exists for key and it's not expired
-func (this *state) exists(key string) bool {
+func (this *DeviceState) exists(key string) bool {
 	if _, exists := this.values[key]; exists == false {
 		return false
 	} else if expires, exists := this.expires[key]; exists == false {
@@ -146,9 +147,10 @@ func (this *state) exists(key string) bool {
 	}
 }
 
-func mapKey(value *event) string {
-	prefix := strings.TrimPrefix(fmt.Sprint(value.type_), "ECOVACS_EVENT_")
-	if value.type_ == home.ECOVACS_EVENT_LIFESPAN {
+func mapKey(value *XMPPMessage) string {
+	valueType := value.Type()
+	prefix := strings.TrimPrefix(fmt.Sprint(valueType), "ECOVACS_EVENT_")
+	if valueType == home.ECOVACS_EVENT_LIFESPAN {
 		part, _, _ := value.LifeSpan()
 		return prefix + "_" + strings.ToUpper(fmt.Sprint(part))
 	} else {
@@ -159,11 +161,11 @@ func mapKey(value *event) string {
 ////////////////////////////////////////////////////////////////////////////////
 // STRINGIFY
 
-func (this *state) String() string {
+func (this *DeviceState) String() string {
 	this.RWMutex.RLock()
 	defer this.RWMutex.RUnlock()
 
-	str := "<state"
+	str := "<DeviceState"
 	for k, v := range this.values {
 		if this.exists(k) {
 			str += fmt.Sprintf(" %v=%v", k, v.Value())
