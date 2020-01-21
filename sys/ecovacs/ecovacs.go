@@ -47,7 +47,7 @@ type ecovacs struct {
 type Response struct {
 	Code      string `json:"code"`
 	Message   string `json:"msg"`
-	Timestamp uint   `json:"time"`
+	Timestamp uint64 `json:"time"`
 }
 
 type AccessToken struct {
