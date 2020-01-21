@@ -7,7 +7,7 @@ import (
 
 func init() {
 	gopi.UnitRegister(gopi.UnitConfig{
-		Name:     "mutablehome/ecovacs",
+		Name:     Ecovacs{}.Name(),
 		Requires: []string{"bus"},
 		Config: func(app gopi.App) error {
 			app.Flags().FlagString("ecovacs.country", "au", "Ecovacs Country Code")
@@ -21,7 +21,7 @@ func init() {
 				AccountId:    app.Flags().GetString("ecovacs.email", gopi.FLAG_NS_DEFAULT),
 				PasswordHash: MD5String(app.Flags().GetString("ecovacs.password", gopi.FLAG_NS_DEFAULT)),
 				Bus:          app.Bus(),
-			}, app.Log().Clone("mutablehome/ecovacs"))
+			}, app.Log().Clone(Ecovacs{}.Name()))
 		},
 	})
 }

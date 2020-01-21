@@ -58,7 +58,7 @@ func (this *EcovacsEvent) Device() home.EvovacsDevice {
 	return this.device
 }
 
-func (this *EcovacsEvent) RequestId() string {
+func (this *EcovacsEvent) Id() string {
 	return this.message.Id()
 }
 
@@ -67,8 +67,8 @@ func (this *EcovacsEvent) RequestId() string {
 
 func (this *EcovacsEvent) String() string {
 	str := "<" + this.Name()
-	if this.RequestId() != "" {
-		str += " request_id=" + this.RequestId()
+	if this.Id() != "" {
+		str += " id=" + this.Id()
 	}
 	if this.Device() != nil {
 		str += " device=" + fmt.Sprint(this.Device())

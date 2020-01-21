@@ -63,7 +63,7 @@ type EvovacsDevice interface {
 type EcovacsEvent interface {
 	Type() EcovacsEventType
 	Device() EvovacsDevice
-	RequestId() string
+	Id() string
 
 	gopi2.Event
 }
@@ -98,6 +98,28 @@ const (
 	ECOVACS_SUCTION_STANDARD EcovacsCleanSuction = "standard"
 	ECOVACS_SUCTION_STRONG   EcovacsCleanSuction = "strong"
 )
+
+////////////////////////////////////////////////////////////////////////////////
+// INFLUXDB
+
+type InfluxDB interface {
+	// Create a new resultset
+	NewResultSet(tags map[string]string) InfluxRS
+
+	// Write rows to the database
+	Write(InfluxRS) error
+}
+
+type InfluxRS interface {
+	// Remove all rows
+	RemoveAll()
+
+	// Add a new row of metrics for a measurement name
+	Add(string, map[string]interface{}) error
+
+	// Add a new row of metrics using timestamp for a measurement name
+	AddTS(string, map[string]interface{}, time.Time) error
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // IKEA TRADFRI

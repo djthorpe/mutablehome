@@ -101,7 +101,7 @@ const (
 ////////////////////////////////////////////////////////////////////////////////
 // IMPLEMENTATION gopi.Unit
 
-func (Ecovacs) Name() string { return "mutablehome.Ecovacs" }
+func (Ecovacs) Name() string { return "mutablehome/ecovacs" }
 
 func (config Ecovacs) New(log gopi.Logger) (gopi.Unit, error) {
 	this := new(ecovacs)
