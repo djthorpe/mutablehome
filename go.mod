@@ -3,16 +3,15 @@ module github.com/djthorpe/mutablehome
 go 1.13
 
 require (
-	github.com/bocajim/dtls v0.0.0-20190919154819-4ef9c2aba394
 	github.com/djthorpe/gopi v1.0.86
 	github.com/djthorpe/gopi-rpc v1.0.16
-	github.com/djthorpe/gopi/v2 v2.0.4
-	github.com/go-ocf/go-coap v0.0.0-20191205091034-1fba24d18397
+	github.com/djthorpe/gopi/v2 v2.0.16
+	github.com/go-ocf/go-coap v0.0.0-20200207111708-e8caffdb9036
+	github.com/golang/protobuf v1.3.3
 	github.com/google/uuid v1.1.1
 	github.com/influxdata/influxdb1-client v0.0.0-20191209144304-8bf82d3c094d
-	github.com/mattn/go-xmpp v0.0.0-20190124093244-6093f50721ed
-	github.com/olekukonko/tablewriter v0.0.4
-	github.com/pion/dtls/v2 v2.0.0-rc.3
-	golang.org/x/crypto v0.0.0-20191206172530-e9b2fee46413
-	gosrc.io/xmpp v0.4.0
+	github.com/mattn/go-xmpp v0.0.0-20200128155807-a86b6abcb3ad
+	github.com/pion/dtls/v2 v2.0.0-rc.5
+	golang.org/x/net v0.0.0-20200202094626-16171245cfb2
+	google.golang.org/grpc v1.27.1
 )

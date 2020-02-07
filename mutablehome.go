@@ -8,12 +8,11 @@
 package mutablehome
 
 import (
-	"context"
 	"errors"
 	"time"
 
 	// Frameworks
-	gopi "github.com/djthorpe/gopi"
+
 	gopi2 "github.com/djthorpe/gopi/v2"
 )
 
@@ -126,24 +125,27 @@ type InfluxRS interface {
 
 type IkeaDeviceType uint
 
-type IkeaTradfri interface {
-	gopi.Driver
+type Tradfri interface {
+	/*
+		// Connect to gateway, using either IP4 or IP6
+		Connect(gopi.RPCServiceRecord, gopi.RPCFlag) error
 
-	// Connect to gateway, using either IP4 or IP6
-	Connect(gopi.RPCServiceRecord, gopi.RPCFlag) error
+		// Return list of devices, groups and scenes
+		Devices() ([]uint, error)
+		Groups() ([]uint, error)
+		Scenes() ([]uint, error)
 
-	// Return list of devices, groups and scenes
-	Devices() ([]uint, error)
-	Groups() ([]uint, error)
-	Scenes() ([]uint, error)
+		// Return details of a specific device, group or scene
+		Device(id uint) (IkeaDevice, error)
+		Group(id uint) (IkeaGroup, error)
+		Scene(id uint) (IkeaScene, error)
 
-	// Return details of a specific device, group or scene
-	Device(id uint) (IkeaDevice, error)
-	Group(id uint) (IkeaGroup, error)
-	Scene(id uint) (IkeaScene, error)
+		// Observe devices
+		ObserveDevice(context.Context, uint) error
+	*/
 
-	// Observe devices
-	ObserveDevice(context.Context, uint) error
+	// Implements Unit
+	gopi2.Unit
 }
 
 type IkeaDevice interface {
