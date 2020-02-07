@@ -83,7 +83,7 @@ func LogEvent(ctx context.Context, app gopi.App, evt_ gopi.Event) {
 	case mutablehome.ECOVACS_EVENT_ERROR:
 		values := evt.Value().([]interface{})
 		errNum := values[0].(uint)
-		errDescription := values[0].(string)
+		errDescription := values[1].(string)
 		if err := rs.Add(measurement, map[string]interface{}{
 			"err_num":         errNum,
 			"err_description": errDescription,
