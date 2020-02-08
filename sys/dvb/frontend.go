@@ -241,6 +241,8 @@ const (
 	DVB_FE_SYS_DVBT2                                   // Terrestrial TV: DVB-T2
 	DVB_FE_SYS_TURBO                                   // Satellite TV: DVB-S Turbo
 	DVB_FE_SYS_DVBC_ANNEX_C                            // Cable TV: DVB-C following ITU-T J.83 Annex C spec
+	DVB_FE_SYS_MIN          = DVB_FE_SYS_DVBC_ANNEX_A
+	DVB_FE_SYS_MAX          = DVB_FE_SYS_DVBC_ANNEX_C
 )
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -16,7 +16,6 @@ import (
 func init() {
 	gopi.UnitRegister(gopi.UnitConfig{
 		Name: Tradfri{}.Name(),
-		Type: gopi.UNIT_PLATFORM,
 		Config: func(app gopi.App) error {
 			app.Flags().FlagString("tradfri.id", "", "Unique identifier")
 			app.Flags().FlagString("tradfri.key", "", "Security code")
