@@ -9,3 +9,4 @@
 .vscode
 *.pb.go
 go.sum
+*.tmp
