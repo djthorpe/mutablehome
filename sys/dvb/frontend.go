@@ -89,10 +89,6 @@ type (
 // CONSTANTS
 
 const (
-	DVB_PATH_WILDCARD = "/dev/dvb/adapter"
-)
-
-const (
 	DVB_FE_CAN_INVERSION_AUTO DVBFrontendCaps = (1 << iota)
 	DVB_FE_CAN_FEC_1_2
 	DVB_FE_CAN_FEC_2_3
@@ -256,23 +252,6 @@ var (
 	DVB_FE_GET_PROPERTY = uintptr(C._FE_GET_PROPERTY())
 	DVB_FE_SET_PROPERTY = uintptr(C._FE_SET_PROPERTY())
 )
-
-////////////////////////////////////////////////////////////////////////////////
-// PUBLIC METHODS
-
-func DVBDevices() ([]uint, error) {
-	if adapters, err := filepath.Glob(DVB_PATH_WILDCARD + "*"); err != nil {
-		return nil, err
-	} else {
-		devices := make([]uint, 0, len(adapters))
-		for _, file := range adapters {
-			if bus, err := strconv.ParseUint(strings.TrimPrefix(file, DVB_PATH_WILDCARD), 10, 32); err == nil {
-				devices = append(devices, uint(bus))
-			}
-		}
-		return devices, nil
-	}
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 // PUBLIC METHODS: FRONT END
@@ -731,13 +710,4 @@ func (s DVBFrontendScale) String() string {
 	default:
 		return "[?? Invalid DVBFrontendScale value]"
 	}
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// PRIVATE METHODS
-
-// Call ioctl
-func dvb_ioctl(fd uintptr, name uintptr, data unsafe.Pointer) syscall.Errno {
-	_, _, err := syscall.RawSyscall(syscall.SYS_IOCTL, fd, name, uintptr(data))
-	return err
 }
