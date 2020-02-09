@@ -33,7 +33,7 @@ func Test_Frontend_002(t *testing.T) {
 		t.Error(err)
 	} else {
 		for _, device := range devices {
-			if dev, err := dvb.DVB_FEOpen(device); err != nil {
+			if dev, err := dvb.DVB_FEOpen(device, 0); err != nil {
 				t.Error(err)
 			} else if info, err := dvb.DVB_FEGetInfo(dev.Fd()); err != nil {
 				t.Error(err)
@@ -50,7 +50,7 @@ func Test_Frontend_003(t *testing.T) {
 		t.Error(err)
 	} else {
 		for _, device := range devices {
-			if dev, err := dvb.DVB_FEOpen(device); err != nil {
+			if dev, err := dvb.DVB_FEOpen(device, 0); err != nil {
 				t.Error(err)
 			} else if status, err := dvb.DVB_FEReadStatus(dev.Fd()); err != nil {
 				t.Error(err)
@@ -67,7 +67,7 @@ func Test_Frontend_004(t *testing.T) {
 		t.Error(err)
 	} else {
 		for _, device := range devices {
-			if dev, err := dvb.DVB_FEOpen(device); err != nil {
+			if dev, err := dvb.DVB_FEOpen(device, 0); err != nil {
 				t.Error(err)
 			} else if major, minor, err := dvb.DVB_FEVersion(dev.Fd()); err != nil {
 				t.Error(err)
@@ -84,12 +84,29 @@ func Test_Frontend_005(t *testing.T) {
 		t.Error(err)
 	} else {
 		for _, device := range devices {
-			if dev, err := dvb.DVB_FEOpen(device); err != nil {
+			if dev, err := dvb.DVB_FEOpen(device, 0); err != nil {
 				t.Error(err)
 			} else if sys, err := dvb.DVB_FEDeliverySystem(dev.Fd()); err != nil {
 				t.Error(err)
 			} else {
 				t.Log(dev.Name(), "=>", sys)
+				dev.Close()
+			}
+		}
+	}
+}
+
+func Test_Frontend_006(t *testing.T) {
+	if devices, err := dvb.DVBDevices(); err != nil {
+		t.Error(err)
+	} else {
+		for _, device := range devices {
+			if dev, err := dvb.DVB_FEOpen(device, 0); err != nil {
+				t.Error(err)
+			} else if enum, err := dvb.DVB_FEDeliverySystemEnum(dev.Fd()); err != nil {
+				t.Error(err)
+			} else {
+				t.Log(dev.Name(), "=>", enum)
 				dev.Close()
 			}
 		}

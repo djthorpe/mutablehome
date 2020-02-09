@@ -15,12 +15,12 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi/v2"
 	base "github.com/djthorpe/gopi/v2/base"
 	home "github.com/djthorpe/mutablehome"
-	dvb "github.com/djthorpe/mutablehome/sys/dvb"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -31,7 +31,6 @@ type Table struct {
 }
 
 type table struct {
-	log      gopi.Logger
 	path     string
 	sections []*section
 
@@ -39,7 +38,7 @@ type table struct {
 }
 
 type section struct {
-	Name     string
+	name     string
 	KeyValue map[string]string
 }
 
@@ -146,15 +145,36 @@ func (this *table) String() string {
 
 func (this *section) String() string {
 	str := "<section" +
-		" name=" + strconv.Quote(this.Name)
-	if sys := this.DeliverySystem(); sys != dvb.DVB_FE_SYS_NONE {
-		str += " delivery_system=" + fmt.Sprint(this.DeliverySystem())
+		" name=" + strconv.Quote(this.name)
+	if sys, err := this.DeliverySystem(); err == nil {
+		str += " delivery_system=" + fmt.Sprint(sys)
 	}
 	if f := this.Frequency(); f != 0 {
 		str += " frequency=" + fmt.Sprint(f)
 	}
 	if bw := this.Bandwidth(); bw != 0 {
 		str += " bandwidth=" + fmt.Sprint(bw)
+	}
+	if codeRateLP, err := this.CodeRateLP(); err == nil {
+		str += " code_rate_lp=" + fmt.Sprint(codeRateLP)
+	}
+	if codeRateHP, err := this.CodeRateHP(); err == nil {
+		str += " code_rate_hp=" + fmt.Sprint(codeRateHP)
+	}
+	if guardInterval, err := this.GuardInterval(); err == nil {
+		str += " guard_interval=" + fmt.Sprint(guardInterval)
+	}
+	if hierarchy, err := this.Hierarchy(); err == nil {
+		str += " hierarchy=" + fmt.Sprint(hierarchy)
+	}
+	if inversion, err := this.Inversion(); err == nil {
+		str += " inversion=" + fmt.Sprint(inversion)
+	}
+	if modulation, err := this.Modulation(); err == nil {
+		str += " modulation=" + fmt.Sprint(modulation)
+	}
+	if transmitMode, err := this.TransmitMode(); err == nil {
+		str += " transmit_mode=" + fmt.Sprint(transmitMode)
 	}
 	str += " values=" + fmt.Sprint(this.KeyValue)
 	return str + ">"
@@ -170,10 +190,7 @@ func (this *table) setSectionName(sections []*section, name string) ([]*section,
 	}
 
 	// Create a new section
-	sections = append(sections, &section{
-		Name:     name,
-		KeyValue: make(map[string]string),
-	})
+	sections = append(sections, &section{name, make(map[string]string)})
 
 	// Return success
 	return sections, nil
@@ -197,19 +214,21 @@ func (this *table) setSectionKeyValue(sections []*section, key, value string) er
 ////////////////////////////////////////////////////////////////////////////////
 // RETURN PROPERTIES
 
-func (this *section) DeliverySystem() dvb.DVBFEDeliverySystem {
+func (this *section) Name() string {
+	return this.name
+}
+
+func (this *section) DeliverySystem() (home.DVBDeliverySystem, error) {
 	if value, exists := this.KeyValue["DELIVERY_SYSTEM"]; exists {
-		value = strings.ToUpper(value)
-		for v := dvb.DVB_FE_SYS_MIN; v <= dvb.DVB_FE_SYS_MAX; v++ {
-			vstr := strings.TrimPrefix(fmt.Sprint(v), "DVB_FE_SYS_")
-			if vstr == value {
-				return v
+		value = MangleValue(value)
+		for v := home.DVB_SYS_MIN; v <= home.DVB_SYS_MAX; v++ {
+			if MatchesValue(value, v, "DVB_SYS_") {
+				return v, nil
 			}
 		}
 	}
-
 	// Not found
-	return dvb.DVB_FE_SYS_NONE
+	return home.DVB_SYS_NONE, gopi.ErrNotFound.WithPrefix("DELIVERY_SYSTEM")
 }
 
 func (this *section) Frequency() uint32 {
@@ -230,4 +249,104 @@ func (this *section) Bandwidth() uint32 {
 	}
 	// Bad parameter
 	return 0
+}
+
+func (this *section) CodeRateHP() (home.DVBCodeRate, error) {
+	return this.CodeRate("CODE_RATE_HP")
+}
+
+func (this *section) CodeRateLP() (home.DVBCodeRate, error) {
+	return this.CodeRate("CODE_RATE_LP")
+}
+
+func (this *section) CodeRate(key string) (home.DVBCodeRate, error) {
+	if value, exists := this.KeyValue[key]; exists {
+		value = MangleValue(value)
+		for v := home.DVB_FEC_MIN; v <= home.DVB_FEC_MAX; v++ {
+			if MatchesValue(value, v, "DVB_FEC_") {
+				return v, nil
+			}
+		}
+	}
+	// Not found
+	return home.DVB_FEC_NONE, gopi.ErrNotFound.WithPrefix(key)
+}
+
+func (this *section) GuardInterval() (home.DVBGuardInterval, error) {
+	if value, exists := this.KeyValue["GUARD_INTERVAL"]; exists {
+		value = MangleValue(value)
+		for v := home.DVB_GUARD_INTERVAL_MIN; v <= home.DVB_GUARD_INTERVAL_MAX; v++ {
+			if MatchesValue(value, v, "DVB_GUARD_INTERVAL_") {
+				return v, nil
+			}
+		}
+	}
+	// Not found
+	return 0, gopi.ErrNotFound.WithPrefix("GUARD_INTERVAL")
+}
+
+func (this *section) Hierarchy() (home.DVBHierarchy, error) {
+	if value, exists := this.KeyValue["HIERARCHY"]; exists {
+		value = MangleValue(value)
+		for v := home.DVB_HIERARCHY_MIN; v <= home.DVB_HIERARCHY_MAX; v++ {
+			if MatchesValue(value, v, "DVB_HIERARCHY_") {
+				return v, nil
+			}
+		}
+	}
+	// Not found
+	return 0, gopi.ErrNotFound.WithPrefix("HIERARCHY")
+}
+
+func (this *section) Inversion() (home.DVBInversion, error) {
+	if value, exists := this.KeyValue["INVERSION"]; exists {
+		value = MangleValue(value)
+		for v := home.DVB_INVERSION_MIN; v <= home.DVB_INVERSION_MAX; v++ {
+			if MatchesValue(value, v, "DVB_INVERSION_") {
+				return v, nil
+			}
+		}
+	}
+	// Not found
+	return 0, gopi.ErrNotFound.WithPrefix("INVERSION")
+}
+
+func (this *section) Modulation() (home.DVBModulation, error) {
+	if value, exists := this.KeyValue["MODULATION"]; exists {
+		value = MangleValue(value)
+		for v := home.DVB_MODULATION_MIN; v <= home.DVB_MODULATION_MAX; v++ {
+			if MatchesValue(value, v, "DVB_MODULATION_") {
+				return v, nil
+			}
+		}
+	}
+	// Not found
+	return 0, gopi.ErrNotFound.WithPrefix("MODULATION")
+}
+
+func (this *section) TransmitMode() (home.DVBTransmitMode, error) {
+	if value, exists := this.KeyValue["TRANSMISSION_MODE"]; exists {
+		value = MangleValue(value)
+		for v := home.DVB_TRANSMIT_MODE_MIN; v <= home.DVB_TRANSMIT_MODE_MAX; v++ {
+			if MatchesValue(value, v, "DVB_TRANSMIT_MODE_") {
+				return v, nil
+			}
+		}
+	}
+	// Not found
+	return 0, gopi.ErrNotFound.WithPrefix("TRANSMISSION_MODE")
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// MANGLE STRING VALUE
+
+func MangleValue(value string) string {
+	parts := strings.FieldsFunc(value, func(c rune) bool {
+		return !unicode.IsLetter(c) && !unicode.IsNumber(c)
+	})
+	return strings.Join(parts, "_")
+}
+
+func MatchesValue(input string, value interface{}, prefix string) bool {
+	return input == strings.TrimPrefix(strings.ToUpper(fmt.Sprint(value)), prefix)
 }

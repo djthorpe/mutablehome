@@ -17,6 +17,9 @@ import (
 	"strings"
 	"syscall"
 	"unsafe"
+
+	// Frameworks
+	mutablehome "github.com/djthorpe/mutablehome"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -50,12 +53,11 @@ import "C"
 // TYPES
 
 type (
-	DVBFrontendInfo     C.struct_dvb_frontend_info
-	DVBFrontendCaps     uint64
-	DVBFrontendStatus   C.int
-	DVBFrontendKey      uint32
-	DVBFrontendValue    C.struct_dtv_property
-	DVBFEDeliverySystem C.int
+	DVBFrontendInfo   C.struct_dvb_frontend_info
+	DVBFrontendCaps   uint64
+	DVBFrontendStatus C.int
+	DVBFrontendKey    uint32
+	DVBFrontendValue  C.struct_dtv_property
 )
 
 type (
@@ -63,6 +65,12 @@ type (
 		Key      uint32
 		reserved [3]uint32
 		Data     uint32
+	}
+	DVBFEPropertyEnum struct {
+		Key      uint32
+		reserved [3]uint32
+		Data     [32]uint8
+		Len      uint32
 	}
 )
 
@@ -221,30 +229,6 @@ const (
 	DVB_FE_KEY_MAX = DVB_FE_KEY_SCRAMBLING_SEQUENCE_INDEX
 )
 
-const (
-	DVB_FE_SYS_NONE         DVBFEDeliverySystem = 0
-	DVB_FE_SYS_DVBC_ANNEX_A DVBFEDeliverySystem = iota // Cable TV: DVB-C following ITU-T J.83 Annex A spec
-	DVB_FE_SYS_DVBC_ANNEX_B                            // Cable TV: DVB-C following ITU-T J.83 Annex B spec (ClearQAM)
-	DVB_FE_SYS_DVBT                                    // Terrestrial TV: DVB-T
-	DVB_FE_SYS_DSS                                     // Satellite TV: DSS (not fully supported)
-	DVB_FE_SYS_DVBS                                    // Satellite TV: DVB-S
-	DVB_FE_SYS_DVBS2                                   // Satellite TV: DVB-S2
-	DVB_FE_SYS_DVBH                                    // Terrestrial TV (mobile): DVB-H (standard deprecated)
-	DVB_FE_SYS_ISDBT                                   // Terrestrial TV: ISDB-T
-	DVB_FE_SYS_ISDBS                                   // Satellite TV: ISDB-S
-	DVB_FE_SYS_ISDBC                                   // Cable TV: ISDB-C (no drivers yet)
-	DVB_FE_SYS_ATSC                                    // Terrestrial TV: ATSC
-	DVB_FE_SYS_ATSCMH                                  // Terrestrial TV (mobile): ATSC-M/H
-	DVB_FE_SYS_DTMB                                    // Terrestrial TV: DTMB
-	DVB_FE_SYS_CMMB                                    // Terrestrial TV (mobile): CMMB (not fully supported)
-	DVB_FE_SYS_DAB                                     // Digital audio: DAB (not fully supported)
-	DVB_FE_SYS_DVBT2                                   // Terrestrial TV: DVB-T2
-	DVB_FE_SYS_TURBO                                   // Satellite TV: DVB-S Turbo
-	DVB_FE_SYS_DVBC_ANNEX_C                            // Cable TV: DVB-C following ITU-T J.83 Annex C spec
-	DVB_FE_SYS_MIN          = DVB_FE_SYS_DVBC_ANNEX_A
-	DVB_FE_SYS_MAX          = DVB_FE_SYS_DVBC_ANNEX_C
-)
-
 ////////////////////////////////////////////////////////////////////////////////
 // VARIABLES
 
@@ -275,12 +259,12 @@ func DVBDevices() ([]uint, error) {
 ////////////////////////////////////////////////////////////////////////////////
 // PUBLIC METHODS: FRONT END
 
-func DVB_FEPath(bus uint) string {
-	return fmt.Sprintf("%v%v/frontend%v", DVB_PATH_WILDCARD, bus, bus)
+func DVB_FEPath(bus, frontend uint) string {
+	return fmt.Sprintf("%v%v/frontend%v", DVB_PATH_WILDCARD, bus, frontend)
 }
 
-func DVB_FEOpen(bus uint) (*os.File, error) {
-	if file, err := os.OpenFile(DVB_FEPath(bus), os.O_SYNC|os.O_RDWR, 0); err != nil {
+func DVB_FEOpen(bus, frontend uint) (*os.File, error) {
+	if file, err := os.OpenFile(DVB_FEPath(bus, frontend), os.O_SYNC|os.O_RDWR, 0); err != nil {
 		return nil, err
 	} else {
 		return file, nil
@@ -329,6 +313,18 @@ func DVB_FESetPropertyUint32(fd uintptr, key DVBFrontendKey, value uint32) error
 	}
 }
 
+func DVB_FEGetPropertyEnum(fd uintptr, key DVBFrontendKey) ([]uint8, error) {
+	property := DVBFEPropertyEnum{Key: uint32(key)}
+	properties := C.struct_dtv_properties{
+		1, (*C.struct_dtv_property)(unsafe.Pointer(&property)),
+	}
+	if err := dvb_ioctl(fd, DVB_FE_GET_PROPERTY, unsafe.Pointer(&properties)); err != 0 {
+		return nil, os.NewSyscallError("dvb_ioctl", err)
+	} else {
+		return property.Data[0:property.Len], nil
+	}
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // PROPERTIES
 
@@ -342,16 +338,156 @@ func DVB_FEVersion(fd uintptr) (uint, uint, error) {
 	}
 }
 
-func DVB_FEDeliverySystem(fd uintptr) (DVBFEDeliverySystem, error) {
-	if sys, err := DVB_FEGetPropertyUint32(fd, DVB_FE_KEY_DELIVERY_SYSTEM); err != nil {
-		return DVB_FE_SYS_NONE, err
+func DVB_FETune(fd uintptr) error {
+	return DVB_FESetPropertyUint32(fd, DVB_FE_KEY_TUNE, uint32(0))
+}
+
+func DVB_FEClear(fd uintptr) error {
+	return DVB_FESetPropertyUint32(fd, DVB_FE_KEY_CLEAR, uint32(0))
+}
+
+func DVB_FEDeliverySystemEnum(fd uintptr) ([]mutablehome.DVBDeliverySystem, error) {
+	if data, err := DVB_FEGetPropertyEnum(fd, DVB_FE_KEY_ENUM_DELSYS); err != nil {
+		return nil, err
 	} else {
-		return DVBFEDeliverySystem(sys), nil
+		enum := make([]mutablehome.DVBDeliverySystem, len(data))
+		for i, value := range data {
+			enum[i] = mutablehome.DVBDeliverySystem(value)
+		}
+		return enum, nil
 	}
 }
 
-func DVB_FESetDeliverySystem(fd uintptr, sys DVBFEDeliverySystem) error {
+func DVB_FEDeliverySystem(fd uintptr) (mutablehome.DVBDeliverySystem, error) {
+	if sys, err := DVB_FEGetPropertyUint32(fd, DVB_FE_KEY_DELIVERY_SYSTEM); err != nil {
+		return mutablehome.DVB_SYS_NONE, err
+	} else {
+		return mutablehome.DVBDeliverySystem(sys), nil
+	}
+}
+
+func DVB_FESetDeliverySystem(fd uintptr, sys mutablehome.DVBDeliverySystem) error {
 	return DVB_FESetPropertyUint32(fd, DVB_FE_KEY_DELIVERY_SYSTEM, uint32(sys))
+}
+
+func DVB_FEFrequency(fd uintptr) (uint, error) {
+	if value, err := DVB_FEGetPropertyUint32(fd, DVB_FE_KEY_FREQUENCY); err != nil {
+		return 0, err
+	} else {
+		return uint(value), err
+	}
+}
+
+func DVB_FESetFrequency(fd uintptr, value uint) error {
+	return DVB_FESetPropertyUint32(fd, DVB_FE_KEY_FREQUENCY, uint32(value))
+}
+
+func DVB_FEBandwidth(fd uintptr) (uint, error) {
+	if value, err := DVB_FEGetPropertyUint32(fd, DVB_FE_KEY_BANDWIDTH_HZ); err != nil {
+		return 0, err
+	} else {
+		return uint(value), err
+	}
+}
+
+func DVB_FESetBandwidth(fd uintptr, value uint) error {
+	return DVB_FESetPropertyUint32(fd, DVB_FE_KEY_BANDWIDTH_HZ, uint32(value))
+}
+
+func DVB_FEModulation(fd uintptr) (mutablehome.DVBModulation, error) {
+	if value, err := DVB_FEGetPropertyUint32(fd, DVB_FE_KEY_MODULATION); err != nil {
+		return 0, err
+	} else {
+		return mutablehome.DVBModulation(value), err
+	}
+}
+
+func DVB_FESetModulation(fd uintptr, value mutablehome.DVBModulation) error {
+	return DVB_FESetPropertyUint32(fd, DVB_FE_KEY_MODULATION, uint32(value))
+}
+
+func DVB_FEInversion(fd uintptr) (mutablehome.DVBInversion, error) {
+	if value, err := DVB_FEGetPropertyUint32(fd, DVB_FE_KEY_INVERSION); err != nil {
+		return 0, err
+	} else {
+		return mutablehome.DVBInversion(value), err
+	}
+}
+
+func DVB_FESetInversion(fd uintptr, value mutablehome.DVBInversion) error {
+	return DVB_FESetPropertyUint32(fd, DVB_FE_KEY_INVERSION, uint32(value))
+}
+
+func DVB_FEGuardInterval(fd uintptr) (mutablehome.DVBGuardInterval, error) {
+	if value, err := DVB_FEGetPropertyUint32(fd, DVB_FE_KEY_GUARD_INTERVAL); err != nil {
+		return 0, err
+	} else {
+		return mutablehome.DVBGuardInterval(value), err
+	}
+}
+
+func DVB_FESetGuardInterval(fd uintptr, value mutablehome.DVBGuardInterval) error {
+	return DVB_FESetPropertyUint32(fd, DVB_FE_KEY_GUARD_INTERVAL, uint32(value))
+}
+
+func DVB_FEHierarchy(fd uintptr) (mutablehome.DVBHierarchy, error) {
+	if value, err := DVB_FEGetPropertyUint32(fd, DVB_FE_KEY_HIERARCHY); err != nil {
+		return mutablehome.DVB_HIERARCHY_NONE, err
+	} else {
+		return mutablehome.DVBHierarchy(value), err
+	}
+}
+
+func DVB_FESetHierarchy(fd uintptr, value mutablehome.DVBHierarchy) error {
+	return DVB_FESetPropertyUint32(fd, DVB_FE_KEY_HIERARCHY, uint32(value))
+}
+
+func DVB_FEInnerFEC(fd uintptr) (mutablehome.DVBCodeRate, error) {
+	if value, err := DVB_FEGetPropertyUint32(fd, DVB_FE_KEY_INNER_FEC); err != nil {
+		return mutablehome.DVB_FEC_NONE, err
+	} else {
+		return mutablehome.DVBCodeRate(value), err
+	}
+}
+
+func DVB_FESetInnerFEC(fd uintptr, value mutablehome.DVBCodeRate) error {
+	return DVB_FESetPropertyUint32(fd, DVB_FE_KEY_INNER_FEC, uint32(value))
+}
+
+func DVB_FECodeRateLP(fd uintptr) (mutablehome.DVBCodeRate, error) {
+	if value, err := DVB_FEGetPropertyUint32(fd, DVB_FE_KEY_CODE_RATE_LP); err != nil {
+		return mutablehome.DVB_FEC_NONE, err
+	} else {
+		return mutablehome.DVBCodeRate(value), err
+	}
+}
+
+func DVB_FESetCodeRateLP(fd uintptr, value mutablehome.DVBCodeRate) error {
+	return DVB_FESetPropertyUint32(fd, DVB_FE_KEY_CODE_RATE_LP, uint32(value))
+}
+
+func DVB_FECodeRateHP(fd uintptr) (mutablehome.DVBCodeRate, error) {
+	if value, err := DVB_FEGetPropertyUint32(fd, DVB_FE_KEY_CODE_RATE_HP); err != nil {
+		return mutablehome.DVB_FEC_NONE, err
+	} else {
+		return mutablehome.DVBCodeRate(value), err
+	}
+}
+
+func DVB_FESetCodeRateHP(fd uintptr, value mutablehome.DVBCodeRate) error {
+	return DVB_FESetPropertyUint32(fd, DVB_FE_KEY_CODE_RATE_HP, uint32(value))
+}
+
+func DVB_FETransmitMode(fd uintptr) (mutablehome.DVBTransmitMode, error) {
+	if value, err := DVB_FEGetPropertyUint32(fd, DVB_FE_KEY_TRANSMISSION_MODE); err != nil {
+		return 0, err
+	} else {
+		return mutablehome.DVBTransmitMode(value), err
+	}
+}
+
+func DVB_FESetTransmitMode(fd uintptr, value mutablehome.DVBTransmitMode) error {
+	return DVB_FESetPropertyUint32(fd, DVB_FE_KEY_TRANSMISSION_MODE, uint32(value))
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -517,51 +653,6 @@ func (s DVBFrontendStatus) StringFlag() string {
 		return "DVB_FE_STATUS_REINIT"
 	default:
 		return "[?? Invalid DVBFrontendStatus value]"
-	}
-}
-
-func (v DVBFEDeliverySystem) String() string {
-	switch v {
-	case DVB_FE_SYS_NONE:
-		return "DVB_FE_SYS_NONE"
-	case DVB_FE_SYS_DVBC_ANNEX_A:
-		return "DVB_FE_SYS_DVBC_ANNEX_A"
-	case DVB_FE_SYS_DVBC_ANNEX_B:
-		return "DVB_FE_SYS_DVBC_ANNEX_B"
-	case DVB_FE_SYS_DVBT:
-		return "DVB_FE_SYS_DVBT"
-	case DVB_FE_SYS_DSS:
-		return "DVB_FE_SYS_DSS"
-	case DVB_FE_SYS_DVBS:
-		return "DVB_FE_SYS_DVBS"
-	case DVB_FE_SYS_DVBS2:
-		return "DVB_FE_SYS_DVBS2"
-	case DVB_FE_SYS_DVBH:
-		return "DVB_FE_SYS_DVBH"
-	case DVB_FE_SYS_ISDBT:
-		return "DVB_FE_SYS_ISDBT"
-	case DVB_FE_SYS_ISDBS:
-		return "DVB_FE_SYS_ISDBS"
-	case DVB_FE_SYS_ISDBC:
-		return "DVB_FE_SYS_ISDBC"
-	case DVB_FE_SYS_ATSC:
-		return "DVB_FE_SYS_ATSC"
-	case DVB_FE_SYS_ATSCMH:
-		return "DVB_FE_SYS_ATSCMH"
-	case DVB_FE_SYS_DTMB:
-		return "DVB_FE_SYS_DTMB"
-	case DVB_FE_SYS_CMMB:
-		return "DVB_FE_SYS_CMMB"
-	case DVB_FE_SYS_DAB:
-		return "DVB_FE_SYS_DAB"
-	case DVB_FE_SYS_DVBT2:
-		return "DVB_FE_SYS_DVBT2"
-	case DVB_FE_SYS_TURBO:
-		return "DVB_FE_SYS_TURBO"
-	case DVB_FE_SYS_DVBC_ANNEX_C:
-		return "DVB_FE_SYS_DVBC_ANNEX_C"
-	default:
-		return "[?? Invalid DVBFEDeliverySystem value]"
 	}
 }
 
