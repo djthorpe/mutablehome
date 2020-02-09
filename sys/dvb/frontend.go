@@ -58,6 +58,7 @@ type (
 	DVBFrontendStatus C.int
 	DVBFrontendKey    uint32
 	DVBFrontendValue  C.struct_dtv_property
+	DVBFrontendScale  uint8
 )
 
 type (
@@ -71,6 +72,16 @@ type (
 		reserved [3]uint32
 		Data     [32]uint8
 		Len      uint32
+	}
+	DVBFrontendStat struct {
+		Scale DVBFrontendScale
+		Value uint64
+	}
+	DVBFrontendStats struct {
+		Key      uint32
+		reserved [3]uint32
+		Len      uint8
+		Stats    [4]DVBFrontendStat
 	}
 )
 
@@ -229,6 +240,13 @@ const (
 	DVB_FE_KEY_MAX = DVB_FE_KEY_SCRAMBLING_SEQUENCE_INDEX
 )
 
+const (
+	DVB_FE_SCALE_NONE DVBFrontendScale = iota
+	DVB_FE_SCALE_DECIBEL
+	DVB_FE_SCALE_RELATIVE
+	DVB_FE_SCALE_COUNTER
+)
+
 ////////////////////////////////////////////////////////////////////////////////
 // VARIABLES
 
@@ -325,8 +343,22 @@ func DVB_FEGetPropertyEnum(fd uintptr, key DVBFrontendKey) ([]uint8, error) {
 	}
 }
 
+func DVB_FEGetPropertyStats(fd uintptr, key DVBFrontendKey) ([]DVBFrontendStat, error) {
+	property := DVBFrontendStats{Key: uint32(key)}
+	properties := C.struct_dtv_properties{
+		1, (*C.struct_dtv_property)(unsafe.Pointer(&property)),
+	}
+	if err := dvb_ioctl(fd, DVB_FE_GET_PROPERTY, unsafe.Pointer(&properties)); err != 0 {
+		return nil, os.NewSyscallError("dvb_ioctl", err)
+	} else if property.Len != 1 {
+		return []DVBFrontendStat{}, nil
+	} else {
+		return property.Stats[0:property.Len], nil
+	}
+}
+
 ////////////////////////////////////////////////////////////////////////////////
-// PROPERTIES
+// PUBLIC METHODS: FRONT END GET/SET PROPERTIES
 
 func DVB_FEVersion(fd uintptr) (uint, uint, error) {
 	if version, err := DVB_FEGetPropertyUint32(fd, DVB_FE_KEY_API_VERSION); err != nil {
@@ -489,6 +521,36 @@ func DVB_FETransmitMode(fd uintptr) (mutablehome.DVBTransmitMode, error) {
 func DVB_FESetTransmitMode(fd uintptr, value mutablehome.DVBTransmitMode) error {
 	return DVB_FESetPropertyUint32(fd, DVB_FE_KEY_TRANSMISSION_MODE, uint32(value))
 }
+
+/////////////////////////////////////////////////////////////////////////////////
+// PUBLIC METHODS: FRONT END GET STATS
+
+func DVB_FEStatSignalStrength(fd uintptr) error {
+	if stats, err := DVB_FEGetPropertyStats(fd, DVB_FE_KEY_STAT_SIGNAL_STRENGTH); err != nil {
+		return err
+	} else {
+		fmt.Println(DVB_FE_KEY_STAT_SIGNAL_STRENGTH, stats)
+		return nil
+	}
+}
+
+func DVB_FEStatCarrierNoiseRatio(fd uintptr) error {
+	if stats, err := DVB_FEGetPropertyStats(fd, DVB_FE_KEY_STAT_CNR); err != nil {
+		return err
+	} else {
+		fmt.Println(DVB_FE_KEY_STAT_CNR, stats)
+		return nil
+	}
+}
+
+/*
+DVB_FE_KEY_STAT_PRE_ERROR_BIT_COUNT  DVBFrontendKey = 64
+DVB_FE_KEY_STAT_PRE_TOTAL_BIT_COUNT  DVBFrontendKey = 65
+DVB_FE_KEY_STAT_POST_ERROR_BIT_COUNT DVBFrontendKey = 66
+DVB_FE_KEY_STAT_POST_TOTAL_BIT_COUNT DVBFrontendKey = 67
+DVB_FE_KEY_STAT_ERROR_BLOCK_COUNT    DVBFrontendKey = 68
+DVB_FE_KEY_STAT_TOTAL_BLOCK_COUNT    DVBFrontendKey = 69
+*/
 
 ////////////////////////////////////////////////////////////////////////////////
 // STRINGIFY
@@ -653,6 +715,21 @@ func (s DVBFrontendStatus) StringFlag() string {
 		return "DVB_FE_STATUS_REINIT"
 	default:
 		return "[?? Invalid DVBFrontendStatus value]"
+	}
+}
+
+func (s DVBFrontendScale) String() string {
+	switch s {
+	case DVB_FE_SCALE_NONE:
+		return "DVB_FE_SCALE_NONE"
+	case DVB_FE_SCALE_DECIBEL:
+		return "DVB_FE_SCALE_DECIBEL"
+	case DVB_FE_SCALE_RELATIVE:
+		return "DVB_FE_SCALE_RELATIVE"
+	case DVB_FE_SCALE_COUNTER:
+		return "DVB_FE_SCALE_COUNTER"
+	default:
+		return "[?? Invalid DVBFrontendScale value]"
 	}
 }
 

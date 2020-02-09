@@ -8,7 +8,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi/v2"
@@ -22,7 +24,12 @@ func Main(app gopi.App, args []string) error {
 	frontend := app.UnitInstance("mutablehome/dvb/frontend").(home.DVBFrontend)
 
 	for _, prop := range table.Properties() {
-		fmt.Println(prop)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+		defer cancel()
+		fmt.Println("Tune", prop.Name(), "frequency=", prop.Frequency(), "Hz")
+		if err := frontend.Tune(ctx, prop); err != nil {
+			app.Log().Error(err)
+		}
 	}
 
 	fmt.Println(frontend)

@@ -9,6 +9,8 @@ package mutablehome
 
 import (
 	// Frameworks
+	"context"
+
 	gopi2 "github.com/djthorpe/gopi/v2"
 )
 
@@ -36,14 +38,19 @@ type DVBFrontend interface {
 	// Return supported delivery systems
 	DeliverySystems() []DVBDeliverySystem
 
-	// Tune with DVB properties
-	Tune(DVBProperties) error
+	// Tune with DVB properties, may timeout
+	Tune(context.Context, DVBProperties) error
+
+	// Implements gopi.Unit
+	gopi2.Unit
 }
 
 type DVBTable interface {
 	// Properties returns an array of DVB Properties
+	// which define one or more signal sources
 	Properties() []DVBProperties
 
+	// Implements gopi.Unit
 	gopi2.Unit
 }
 
