@@ -10,15 +10,16 @@
 package dvb
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"unsafe"
 
 	// Frameworks
+
 	mutablehome "github.com/djthorpe/mutablehome"
 )
 
@@ -63,25 +64,32 @@ type (
 
 type (
 	DVBFEPropertyUint32 struct {
-		Key      uint32
+		Key      DVBFrontendKey
 		reserved [3]uint32
 		Data     uint32
+		result   C.int
 	}
 	DVBFEPropertyEnum struct {
-		Key      uint32
-		reserved [3]uint32
-		Data     [32]uint8
-		Len      uint32
+		Key       DVBFrontendKey
+		reserved  [3]uint32
+		Data      [32]uint8
+		Len       uint32
+		reserved1 [11]byte
+		reserved2 uintptr
+		result    C.int
+	}
+	DVBFrontendStats struct {
+		Key       DVBFrontendKey
+		reserved  [3]uint32
+		Len       uint8
+		Data      [9 * 4]byte // Up to four stats of 9 bytes
+		reserved1 [11]byte
+		reserved2 uintptr
+		result    C.int
 	}
 	DVBFrontendStat struct {
 		Scale DVBFrontendScale
-		Value uint64
-	}
-	DVBFrontendStats struct {
-		Key      uint32
-		reserved [3]uint32
-		Len      uint8
-		Stats    [4]DVBFrontendStat
+		Value int64
 	}
 )
 
@@ -219,14 +227,14 @@ const (
 	DVB_FE_KEY_LNA          DVBFrontendKey = 61
 
 	/* Quality parameters */
-	DVB_FE_KEY_STAT_SIGNAL_STRENGTH      DVBFrontendKey = 62
-	DVB_FE_KEY_STAT_CNR                  DVBFrontendKey = 63
-	DVB_FE_KEY_STAT_PRE_ERROR_BIT_COUNT  DVBFrontendKey = 64
-	DVB_FE_KEY_STAT_PRE_TOTAL_BIT_COUNT  DVBFrontendKey = 65
-	DVB_FE_KEY_STAT_POST_ERROR_BIT_COUNT DVBFrontendKey = 66
-	DVB_FE_KEY_STAT_POST_TOTAL_BIT_COUNT DVBFrontendKey = 67
-	DVB_FE_KEY_STAT_ERROR_BLOCK_COUNT    DVBFrontendKey = 68
-	DVB_FE_KEY_STAT_TOTAL_BLOCK_COUNT    DVBFrontendKey = 69
+	DVB_FE_STAT_SIGNAL_STRENGTH      DVBFrontendKey = 62
+	DVB_FE_STAT_CNR                  DVBFrontendKey = 63
+	DVB_FE_STAT_PRE_ERROR_BIT_COUNT  DVBFrontendKey = 64
+	DVB_FE_STAT_PRE_TOTAL_BIT_COUNT  DVBFrontendKey = 65
+	DVB_FE_STAT_POST_ERROR_BIT_COUNT DVBFrontendKey = 66
+	DVB_FE_STAT_POST_TOTAL_BIT_COUNT DVBFrontendKey = 67
+	DVB_FE_STAT_ERROR_BLOCK_COUNT    DVBFrontendKey = 68
+	DVB_FE_STAT_TOTAL_BLOCK_COUNT    DVBFrontendKey = 69
 
 	/* Physical layer scrambling */
 	DVB_FE_KEY_SCRAMBLING_SEQUENCE_INDEX DVBFrontendKey = 70
@@ -287,7 +295,7 @@ func DVB_FEReadStatus(fd uintptr) (DVBFrontendStatus, error) {
 }
 
 func DVB_FEGetPropertyUint32(fd uintptr, key DVBFrontendKey) (uint32, error) {
-	property := DVBFEPropertyUint32{Key: uint32(key)}
+	property := DVBFEPropertyUint32{Key: key}
 	properties := C.struct_dtv_properties{
 		1, (*C.struct_dtv_property)(unsafe.Pointer(&property)),
 	}
@@ -299,7 +307,7 @@ func DVB_FEGetPropertyUint32(fd uintptr, key DVBFrontendKey) (uint32, error) {
 }
 
 func DVB_FESetPropertyUint32(fd uintptr, key DVBFrontendKey, value uint32) error {
-	property := DVBFEPropertyUint32{Key: uint32(key), Data: value}
+	property := DVBFEPropertyUint32{Key: key, Data: value}
 	properties := C.struct_dtv_properties{
 		1, (*C.struct_dtv_property)(unsafe.Pointer(&property)),
 	}
@@ -311,7 +319,7 @@ func DVB_FESetPropertyUint32(fd uintptr, key DVBFrontendKey, value uint32) error
 }
 
 func DVB_FEGetPropertyEnum(fd uintptr, key DVBFrontendKey) ([]uint8, error) {
-	property := DVBFEPropertyEnum{Key: uint32(key)}
+	property := DVBFEPropertyEnum{Key: key}
 	properties := C.struct_dtv_properties{
 		1, (*C.struct_dtv_property)(unsafe.Pointer(&property)),
 	}
@@ -319,20 +327,6 @@ func DVB_FEGetPropertyEnum(fd uintptr, key DVBFrontendKey) ([]uint8, error) {
 		return nil, os.NewSyscallError("dvb_ioctl", err)
 	} else {
 		return property.Data[0:property.Len], nil
-	}
-}
-
-func DVB_FEGetPropertyStats(fd uintptr, key DVBFrontendKey) ([]DVBFrontendStat, error) {
-	property := DVBFrontendStats{Key: uint32(key)}
-	properties := C.struct_dtv_properties{
-		1, (*C.struct_dtv_property)(unsafe.Pointer(&property)),
-	}
-	if err := dvb_ioctl(fd, DVB_FE_GET_PROPERTY, unsafe.Pointer(&properties)); err != 0 {
-		return nil, os.NewSyscallError("dvb_ioctl", err)
-	} else if property.Len != 1 {
-		return []DVBFrontendStat{}, nil
-	} else {
-		return property.Stats[0:property.Len], nil
 	}
 }
 
@@ -501,35 +495,65 @@ func DVB_FESetTransmitMode(fd uintptr, value mutablehome.DVBTransmitMode) error 
 	return DVB_FESetPropertyUint32(fd, DVB_FE_KEY_TRANSMISSION_MODE, uint32(value))
 }
 
+func DVB_FEStats(fd uintptr) (map[DVBFrontendKey]DVBFrontendStat, error) {
+	stats := [...]DVBFrontendStats{
+		DVBFrontendStats{Key: DVB_FE_STAT_SIGNAL_STRENGTH, Len: 4},
+		DVBFrontendStats{Key: DVB_FE_STAT_CNR, Len: 4},
+		DVBFrontendStats{Key: DVB_FE_STAT_PRE_ERROR_BIT_COUNT, Len: 4},
+		DVBFrontendStats{Key: DVB_FE_STAT_PRE_TOTAL_BIT_COUNT, Len: 4},
+		DVBFrontendStats{Key: DVB_FE_STAT_POST_ERROR_BIT_COUNT, Len: 4},
+		DVBFrontendStats{Key: DVB_FE_STAT_POST_TOTAL_BIT_COUNT, Len: 4},
+		DVBFrontendStats{Key: DVB_FE_STAT_ERROR_BLOCK_COUNT, Len: 4},
+		DVBFrontendStats{Key: DVB_FE_STAT_TOTAL_BLOCK_COUNT, Len: 4},
+	}
+	properties := C.struct_dtv_properties{
+		C.uint(len(stats)), (*C.struct_dtv_property)(unsafe.Pointer(&stats[0])),
+	}
+	if err := dvb_ioctl(fd, DVB_FE_GET_PROPERTY, unsafe.Pointer(&properties)); err != 0 {
+		return nil, os.NewSyscallError("dvb_ioctl", err)
+	} else {
+		statMap := make(map[DVBFrontendKey]DVBFrontendStat, len(stats))
+		for _, s := range stats {
+			if s.Len > 0 {
+				stat := DVBFrontendStat{}
+				if err := binary.Read(bytes.NewReader(s.Data[:]), binary.LittleEndian, &stat); err != nil {
+					return nil, err
+				} else if stat.Scale != 0 {
+					statMap[s.Key] = stat
+				}
+			}
+		}
+		return statMap, nil
+	}
+}
+
 /////////////////////////////////////////////////////////////////////////////////
-// PUBLIC METHODS: FRONT END GET STATS
+// DVBFrontendStat
 
-func DVB_FEStatSignalStrength(fd uintptr) error {
-	if stats, err := DVB_FEGetPropertyStats(fd, DVB_FE_KEY_STAT_SIGNAL_STRENGTH); err != nil {
-		return err
-	} else {
-		fmt.Println(DVB_FE_KEY_STAT_SIGNAL_STRENGTH, stats)
-		return nil
-	}
+func (stat DVBFrontendStat) Decibel() float64 {
+	return float64(stat.Value) * 0.001
 }
 
-func DVB_FEStatCarrierNoiseRatio(fd uintptr) error {
-	if stats, err := DVB_FEGetPropertyStats(fd, DVB_FE_KEY_STAT_CNR); err != nil {
-		return err
-	} else {
-		fmt.Println(DVB_FE_KEY_STAT_CNR, stats)
-		return nil
-	}
+func (stat DVBFrontendStat) Relative() float64 {
+	return float64(stat.Value&0xFFFF) * 100
 }
 
-/*
-DVB_FE_KEY_STAT_PRE_ERROR_BIT_COUNT  DVBFrontendKey = 64
-DVB_FE_KEY_STAT_PRE_TOTAL_BIT_COUNT  DVBFrontendKey = 65
-DVB_FE_KEY_STAT_POST_ERROR_BIT_COUNT DVBFrontendKey = 66
-DVB_FE_KEY_STAT_POST_TOTAL_BIT_COUNT DVBFrontendKey = 67
-DVB_FE_KEY_STAT_ERROR_BLOCK_COUNT    DVBFrontendKey = 68
-DVB_FE_KEY_STAT_TOTAL_BLOCK_COUNT    DVBFrontendKey = 69
-*/
+func (stat DVBFrontendStat) Counter() uint64 {
+	return uint64(stat.Value)
+}
+
+func (stat DVBFrontendStat) String() string {
+	switch stat.Scale {
+	case DVB_FE_SCALE_COUNTER:
+		return fmt.Sprint(stat.Counter())
+	case DVB_FE_SCALE_DECIBEL:
+		return fmt.Sprintf("%.1fdB", stat.Decibel())
+	case DVB_FE_SCALE_RELATIVE:
+		return fmt.Sprintf("%.1f%%", stat.Relative())
+	default:
+		return fmt.Sprintf("{scale=0x%02X,value=0x%08X}", uint8(stat.Scale), stat.Value)
+	}
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // STRINGIFY
@@ -709,5 +733,154 @@ func (s DVBFrontendScale) String() string {
 		return "DVB_FE_SCALE_COUNTER"
 	default:
 		return "[?? Invalid DVBFrontendScale value]"
+	}
+}
+
+func (k DVBFrontendKey) String() string {
+	switch k {
+	case DVB_FE_KEY_NONE:
+		return "DVB_FE_KEY_NONE"
+	case DVB_FE_KEY_TUNE:
+		return "DVB_FE_KEY_TUNE"
+	case DVB_FE_KEY_CLEAR:
+		return "DVB_FE_KEY_CLEAR"
+	case DVB_FE_KEY_FREQUENCY:
+		return "DVB_FE_KEY_FREQUENCY"
+	case DVB_FE_KEY_MODULATION:
+		return "DVB_FE_KEY_MODULATION"
+	case DVB_FE_KEY_BANDWIDTH_HZ:
+		return "DVB_FE_KEY_BANDWIDTH_HZ"
+	case DVB_FE_KEY_INVERSION:
+		return "DVB_FE_KEY_INVERSION"
+	case DVB_FE_KEY_DISEQC_MASTER:
+		return "DVB_FE_KEY_DISEQC_MASTER"
+	case DVB_FE_KEY_SYMBOL_RATE:
+		return "DVB_FE_KEY_SYMBOL_RATE"
+	case DVB_FE_KEY_INNER_FEC:
+		return "DVB_FE_KEY_INNER_FEC"
+	case DVB_FE_KEY_VOLTAGE:
+		return "DVB_FE_KEY_VOLTAGE"
+	case DVB_FE_KEY_TONE:
+		return "DVB_FE_KEY_TONE"
+	case DVB_FE_KEY_PILOT:
+		return "DVB_FE_KEY_PILOT"
+	case DVB_FE_KEY_ROLLOFF:
+		return "DVB_FE_KEY_ROLLOFF"
+	case DVB_FE_KEY_DISEQC_SLAVE_REPLY:
+		return "DVB_FE_KEY_DISEQC_SLAVE_REPLY"
+	case DVB_FE_KEY_FE_CAPABILITY_COUNT:
+		return "DVB_FE_KEY_FE_CAPABILITY_COUNT"
+	case DVB_FE_KEY_FE_CAPABILITY:
+		return "DVB_FE_KEY_FE_CAPABILITY"
+	case DVB_FE_KEY_DELIVERY_SYSTEM:
+		return "DVB_FE_KEY_DELIVERY_SYSTEM"
+	case DVB_FE_KEY_ISDBT_PARTIAL_RECEPTION:
+		return "DVB_FE_KEY_ISDBT_PARTIAL_RECEPTION"
+	case DVB_FE_KEY_ISDBT_SOUND_BROADCASTING:
+		return "DVB_FE_KEY_ISDBT_SOUND_BROADCASTING"
+	case DVB_FE_KEY_ISDBT_SB_SUBCHANNEL_ID:
+		return "DVB_FE_KEY_ISDBT_SB_SUBCHANNEL_ID"
+	case DVB_FE_KEY_ISDBT_SB_SEGMENT_IDX:
+		return "DVB_FE_KEY_ISDBT_SB_SEGMENT_IDX"
+	case DVB_FE_KEY_ISDBT_SB_SEGMENT_COUNT:
+		return "DVB_FE_KEY_ISDBT_SB_SEGMENT_COUNT"
+	case DVB_FE_KEY_ISDBT_LAYERA_FEC:
+		return "DVB_FE_KEY_ISDBT_LAYERA_FEC"
+	case DVB_FE_KEY_ISDBT_LAYERA_MODULATION:
+		return "DVB_FE_KEY_ISDBT_LAYERA_MODULATION"
+	case DVB_FE_KEY_ISDBT_LAYERA_SEGMENT_COUNT:
+		return "DVB_FE_KEY_ISDBT_LAYERA_SEGMENT_COUNT"
+	case DVB_FE_KEY_ISDBT_LAYERA_TIME_INTERLEAVING:
+		return "DVB_FE_KEY_ISDBT_LAYERA_TIME_INTERLEAVING"
+	case DVB_FE_KEY_ISDBT_LAYERB_FEC:
+		return "DVB_FE_KEY_ISDBT_LAYERB_FEC"
+	case DVB_FE_KEY_ISDBT_LAYERB_MODULATION:
+		return "DVB_FE_KEY_ISDBT_LAYERB_MODULATION"
+	case DVB_FE_KEY_ISDBT_LAYERB_SEGMENT_COUNT:
+		return "DVB_FE_KEY_ISDBT_LAYERB_SEGMENT_COUNT"
+	case DVB_FE_KEY_ISDBT_LAYERB_TIME_INTERLEAVING:
+		return "DVB_FE_KEY_ISDBT_LAYERB_TIME_INTERLEAVING"
+	case DVB_FE_KEY_ISDBT_LAYERC_FEC:
+		return "DVB_FE_KEY_ISDBT_LAYERC_FEC"
+	case DVB_FE_KEY_ISDBT_LAYERC_MODULATION:
+		return "DVB_FE_KEY_ISDBT_LAYERC_MODULATION"
+	case DVB_FE_KEY_ISDBT_LAYERC_SEGMENT_COUNT:
+		return "DVB_FE_KEY_ISDBT_LAYERC_SEGMENT_COUNT"
+	case DVB_FE_KEY_ISDBT_LAYERC_TIME_INTERLEAVING:
+		return "DVB_FE_KEY_ISDBT_LAYERC_TIME_INTERLEAVING"
+	case DVB_FE_KEY_API_VERSION:
+		return "DVB_FE_KEY_API_VERSION"
+	case DVB_FE_KEY_CODE_RATE_HP:
+		return "DVB_FE_KEY_CODE_RATE_HP"
+	case DVB_FE_KEY_CODE_RATE_LP:
+		return "DVB_FE_KEY_CODE_RATE_LP"
+	case DVB_FE_KEY_GUARD_INTERVAL:
+		return "DVB_FE_KEY_GUARD_INTERVAL"
+	case DVB_FE_KEY_TRANSMISSION_MODE:
+		return "DVB_FE_KEY_TRANSMISSION_MODE"
+	case DVB_FE_KEY_HIERARCHY:
+		return "DVB_FE_KEY_HIERARCHY"
+	case DVB_FE_KEY_ISDBT_LAYER_ENABLED:
+		return "DVB_FE_KEY_ISDBT_LAYER_ENABLED"
+	case DVB_FE_KEY_STREAM_ID:
+		return "DVB_FE_KEY_STREAM_ID"
+	case DVB_FE_KEY_DVBT2_PLP_ID_LEGACY:
+		return "DVB_FE_KEY_DVBT2_PLP_ID_LEGACY"
+	case DVB_FE_KEY_ENUM_DELSYS:
+		return "DVB_FE_KEY_ENUM_DELSYS"
+	case DVB_FE_KEY_ATSCMH_FIC_VER:
+		return "DVB_FE_KEY_ATSCMH_FIC_VER"
+	case DVB_FE_KEY_ATSCMH_PARADE_ID:
+		return "DVB_FE_KEY_ATSCMH_PARADE_ID"
+	case DVB_FE_KEY_ATSCMH_NOG:
+		return "DVB_FE_KEY_ATSCMH_NOG"
+	case DVB_FE_KEY_ATSCMH_TNOG:
+		return "DVB_FE_KEY_ATSCMH_TNOG"
+	case DVB_FE_KEY_ATSCMH_SGN:
+		return "DVB_FE_KEY_ATSCMH_SGN"
+	case DVB_FE_KEY_ATSCMH_PRC:
+		return "DVB_FE_KEY_ATSCMH_PRC"
+	case DVB_FE_KEY_ATSCMH_RS_FRAME_MODE:
+		return "DVB_FE_KEY_ATSCMH_RS_FRAME_MODE"
+	case DVB_FE_KEY_ATSCMH_RS_FRAME_ENSEMBLE:
+		return "DVB_FE_KEY_ATSCMH_RS_FRAME_ENSEMBLE"
+	case DVB_FE_KEY_ATSCMH_RS_CODE_MODE_PRI:
+		return "DVB_FE_KEY_ATSCMH_RS_CODE_MODE_PRI"
+	case DVB_FE_KEY_ATSCMH_RS_CODE_MODE_SEC:
+		return "DVB_FE_KEY_ATSCMH_RS_CODE_MODE_SEC"
+	case DVB_FE_KEY_ATSCMH_SCCC_BLOCK_MODE:
+		return "DVB_FE_KEY_ATSCMH_SCCC_BLOCK_MODE"
+	case DVB_FE_KEY_ATSCMH_SCCC_CODE_MODE_A:
+		return "DVB_FE_KEY_ATSCMH_SCCC_CODE_MODE_A"
+	case DVB_FE_KEY_ATSCMH_SCCC_CODE_MODE_B:
+		return "DVB_FE_KEY_ATSCMH_SCCC_CODE_MODE_B"
+	case DVB_FE_KEY_ATSCMH_SCCC_CODE_MODE_C:
+		return "DVB_FE_KEY_ATSCMH_SCCC_CODE_MODE_C"
+	case DVB_FE_KEY_ATSCMH_SCCC_CODE_MODE_D:
+		return "DVB_FE_KEY_ATSCMH_SCCC_CODE_MODE_D"
+	case DVB_FE_KEY_INTERLEAVING:
+		return "DVB_FE_KEY_INTERLEAVING"
+	case DVB_FE_KEY_LNA:
+		return "DVB_FE_KEY_LNA"
+	case DVB_FE_STAT_SIGNAL_STRENGTH:
+		return "DVB_FE_STAT_SIGNAL_STRENGTH"
+	case DVB_FE_STAT_CNR:
+		return "DVB_FE_STAT_CNR"
+	case DVB_FE_STAT_PRE_ERROR_BIT_COUNT:
+		return "DVB_FE_STAT_PRE_ERROR_BIT_COUNT"
+	case DVB_FE_STAT_PRE_TOTAL_BIT_COUNT:
+		return "DVB_FE_STAT_PRE_TOTAL_BIT_COUNT"
+	case DVB_FE_STAT_POST_ERROR_BIT_COUNT:
+		return "DVB_FE_STAT_POST_ERROR_BIT_COUNT"
+	case DVB_FE_STAT_POST_TOTAL_BIT_COUNT:
+		return "DVB_FE_STAT_POST_TOTAL_BIT_COUNT"
+	case DVB_FE_STAT_ERROR_BLOCK_COUNT:
+		return "DVB_FE_STAT_ERROR_BLOCK_COUNT"
+	case DVB_FE_STAT_TOTAL_BLOCK_COUNT:
+		return "DVB_FE_STAT_TOTAL_BLOCK_COUNT"
+	case DVB_FE_KEY_SCRAMBLING_SEQUENCE_INDEX:
+		return "DVB_FE_KEY_SCRAMBLING_SEQUENCE_INDEX"
+	default:
+		return "[?? Invalid DVBFrontendKey value]"
 	}
 }

@@ -163,11 +163,14 @@ FOR_LOOP:
 		case <-ticker.C:
 			if status, err := dvb.DVB_FEReadStatus(this.dev.Fd()); err != nil {
 				return err
-			} else {
-				fmt.Println(status)
-				dvb.DVB_FEStatSignalStrength(this.dev.Fd())
-				dvb.DVB_FEStatCarrierNoiseRatio(this.dev.Fd())
-
+			} else if status != 0 {
+				fmt.Print("  status=", status)
+				if stats, err := dvb.DVB_FEStats(this.dev.Fd()); err != nil {
+					fmt.Println(" DVB_FEStats err=", err)
+				} else {
+					fmt.Print(" stats=", stats)
+				}
+				fmt.Println("")
 				if status&dvb.DVB_FE_STATUS_HAS_LOCK == dvb.DVB_FE_STATUS_HAS_LOCK {
 					ticker.Stop()
 					break FOR_LOOP
