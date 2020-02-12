@@ -23,7 +23,7 @@ import (
 // BOOTSTRAP
 
 func main() {
-	if app, err := app.NewCommandLineTool(Main, nil, "mutablehome/dvb/table", "mutablehome/dvb/frontend"); err != nil {
+	if app, err := app.NewCommandLineTool(Main, nil, "mutablehome/dvb/table", "mutablehome/dvb/frontend", "mutablehome/dvb/demux"); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	} else {
 		// Run and exit

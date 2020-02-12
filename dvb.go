@@ -38,12 +38,23 @@ type DVBFrontend interface {
 	// Return supported delivery systems
 	DeliverySystems() []DVBDeliverySystem
 
-	// Tune with DVB properties, may timeout
+	// Tune with DVB properties, may timeout and return error
 	Tune(context.Context, DVBProperties) error
 
 	// Implements gopi.Unit
 	gopi2.Unit
 }
+
+type DVBDemux interface {
+
+	// Add a section filter with a Pid
+	NewSectionFilter(uint16) (DVBFilter, error)
+
+	// Implements gopi.Unit
+	gopi2.Unit
+}
+
+type DVBFilter interface{}
 
 type DVBTable interface {
 	// Properties returns an array of DVB Properties
