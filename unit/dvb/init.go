@@ -42,7 +42,7 @@ func init() {
 	})
 	gopi.UnitRegister(gopi.UnitConfig{
 		Name:     Demux{}.Name(),
-		Requires: []string{Frontend{}.Name()},
+		Requires: []string{Frontend{}.Name(), "gopi/filepoll", "gopi/bus"},
 		Config: func(app gopi.App) error {
 			app.Flags().FlagUint("dvb.demux", 0, "DVB Demux")
 			return nil
@@ -52,6 +52,8 @@ func init() {
 				Adapter:  app.Flags().GetUint("dvb.adapter", gopi.FLAG_NS_DEFAULT),
 				Demux:    app.Flags().GetUint("dvb.demux", gopi.FLAG_NS_DEFAULT),
 				Frontend: app.UnitInstance(Frontend{}.Name()).(mutablehome.DVBFrontend),
+				FilePoll: app.UnitInstance("gopi/filepoll").(gopi.FilePoll),
+				Bus:      app.UnitInstance("gopi/bus").(gopi.Bus),
 			}, app.Log().Clone(Demux{}.Name()))
 		},
 	})

@@ -10,6 +10,7 @@ package mutablehome
 import (
 	// Frameworks
 	"context"
+	"fmt"
 
 	gopi2 "github.com/djthorpe/gopi/v2"
 )
@@ -26,6 +27,8 @@ type (
 	DVBModulation     uint
 	DVBCodeRate       uint
 	DVBInversion      uint
+	DVBTableType      uint8
+	DVBStreamType     uint8
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -46,15 +49,52 @@ type DVBFrontend interface {
 }
 
 type DVBDemux interface {
+	// Scan for Program Association Table (PAT). Emits the
+	// DVBSection on the message bus
+	ScanPAT() (DVBFilter, error)
 
-	// Add a section filter with a Pid
-	NewSectionFilter(uint16) (DVBFilter, error)
+	// Scan for Program Map Specific Data.  Emits the
+	// DVBSections on the message bus
+	ScanPMT(DVBSection) ([]DVBFilter, error)
+
+	// Scan for Service Description Data.  Emits the
+	// DVBSections on the message bus. Setting argument
+	// to true looks for SDT sections for other transponders
+	ScanSDT(bool) (DVBFilter, error)
+
+	// Scan Network Information Table. Emits the
+	// DVBSections on the message bus. Setting argument
+	// to true looks for NIT sections for other transponders
+	ScanNIT(bool) (DVBFilter, error)
+
+	// Scan Event Information Table (now/next). Emits the
+	// DVBSections on the message bus. Setting argument
+	// to true looks for EIT sections for other transponders
+	ScanEITNowNext(bool) (DVBFilter, error)
+
+	// New Stream Filter
+	NewStreamFilter([]uint16) (DVBFilter, error)
+
+	// Close filter
+	DestroyFilter(DVBFilter) error
 
 	// Implements gopi.Unit
 	gopi2.Unit
 }
 
-type DVBFilter interface{}
+type DVBFilter interface {
+	// Start and stop streaming
+	Start() error
+	Stop() error
+
+	// Return file descriptor
+	Fd() uintptr
+}
+
+type DVBSection interface {
+	// Return type of section
+	Type() DVBTableType
+}
 
 type DVBTable interface {
 	// Properties returns an array of DVB Properties
@@ -79,6 +119,17 @@ type DVBProperties interface {
 	TransmitMode() (DVBTransmitMode, error)
 	CodeRateLP() (DVBCodeRate, error)
 	CodeRateHP() (DVBCodeRate, error)
+}
+
+// DVBSectionEvent is emitted after a section packet is
+// parsed
+type DVBSectionEvent interface {
+	Type() DVBTableType
+	Filter() DVBFilter
+	Section() DVBSection
+
+	// Implements gopi.Event
+	gopi2.Event
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -208,6 +259,43 @@ const (
 
 	DVB_INVERSION_MIN = DVB_INVERSION_OFF
 	DVB_INVERSION_MAX = DVB_INVERSION_AUTO
+)
+
+const (
+	DVB_TS_TABLE_PAT       DVBTableType = 0x00
+	DVB_TS_TABLE_CAT       DVBTableType = 0x01
+	DVB_TS_TABLE_PMT       DVBTableType = 0x02
+	DVB_TS_TABLE_NIT       DVBTableType = 0x40
+	DVB_TS_TABLE_NIT_OTHER DVBTableType = 0x41
+	DVB_TS_TABLE_SDT       DVBTableType = 0x42
+	DVB_TS_TABLE_SDT_OTHER DVBTableType = 0x46
+	DVB_TS_TABLE_BAT       DVBTableType = 0x4A
+	DVB_TS_TABLE_EIT       DVBTableType = 0x4E
+	DVB_TS_TABLE_EIT_OTHER DVBTableType = 0x4F
+	DVB_TS_TABLE_TDT       DVBTableType = 0x70
+)
+
+const (
+	DVB_ES_TYPE_NONE DVBStreamType = iota
+	DVB_ES_TYPE_MPEG1_VIDEO
+	DVB_ES_TYPE_MPEG2_VIDEO
+	DVB_ES_TYPE_MPEG1_AUDIO
+	DVB_ES_TYPE_MPEG2_AUDIO
+	DVB_ES_TYPE_PRIV_SECT
+	DVB_ES_TYPE_PRIV_PES
+	DVB_ES_TYPE_MHEG
+	DVB_ES_TYPE_DSMCC
+	DVB_ES_TYPE_H222_1
+	DVB_ES_TYPE_DSMCC_A
+	DVB_ES_TYPE_DSMCC_B
+	DVB_ES_TYPE_DSMCC_C
+	DVB_ES_TYPE_DSMCC_D
+	DVB_ES_TYPE_MPEG2_AUX
+	DVB_ES_TYPE_AAC
+	DVB_ES_TYPE_MPEG4_VIDEO
+	DVB_ES_TYPE_MPEG4_AUDIO
+	DVB_ES_TYPE_H264_VIDEO DVBStreamType = 0x1B
+	DVB_ES_TYPE_H265_VIDEO DVBStreamType = 0x24
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -422,5 +510,77 @@ func (v DVBInversion) String() string {
 		return "DVB_INVERSION_AUTO"
 	default:
 		return "[?? Invalid DVBInversion value]"
+	}
+}
+
+func (v DVBTableType) String() string {
+	switch v {
+	case DVB_TS_TABLE_PAT:
+		return "DVB_TS_TABLE_PAT"
+	case DVB_TS_TABLE_CAT:
+		return "DVB_TS_TABLE_CAT"
+	case DVB_TS_TABLE_PMT:
+		return "DVB_TS_TABLE_PMT"
+	case DVB_TS_TABLE_NIT:
+		return "DVB_TS_TABLE_NIT"
+	case DVB_TS_TABLE_NIT_OTHER:
+		return "DVB_TS_TABLE_NIT_OTHER"
+	case DVB_TS_TABLE_SDT:
+		return "DVB_TS_TABLE_SDT"
+	case DVB_TS_TABLE_SDT_OTHER:
+		return "DVB_TS_TABLE_SDT_OTHER"
+	case DVB_TS_TABLE_EIT:
+		return "DVB_TS_TABLE_EIT"
+	case DVB_TS_TABLE_TDT:
+		return "DVB_TS_TABLE_TDT"
+	default:
+		return "[?? Invalid DVBTableType value]"
+	}
+}
+
+func (v DVBStreamType) String() string {
+	switch v {
+	case DVB_ES_TYPE_NONE:
+		return "DVB_ES_TYPE_NONE"
+	case DVB_ES_TYPE_MPEG1_VIDEO:
+		return "DVB_ES_TYPE_MPEG1_VIDEO"
+	case DVB_ES_TYPE_MPEG2_VIDEO:
+		return "DVB_ES_TYPE_MPEG2_VIDEO"
+	case DVB_ES_TYPE_MPEG1_AUDIO:
+		return "DVB_ES_TYPE_MPEG1_AUDIO"
+	case DVB_ES_TYPE_MPEG2_AUDIO:
+		return "DVB_ES_TYPE_MPEG2_AUDIO"
+	case DVB_ES_TYPE_PRIV_SECT:
+		return "DVB_ES_TYPE_PRIV_SECT"
+	case DVB_ES_TYPE_PRIV_PES:
+		return "DVB_ES_TYPE_PRIV_PES"
+	case DVB_ES_TYPE_MHEG:
+		return "DVB_ES_TYPE_MHEG"
+	case DVB_ES_TYPE_DSMCC:
+		return "DVB_ES_TYPE_DSMCC"
+	case DVB_ES_TYPE_H222_1:
+		return "DVB_ES_TYPE_H222_1"
+	case DVB_ES_TYPE_DSMCC_A:
+		return "DVB_ES_TYPE_DSMCC_A"
+	case DVB_ES_TYPE_DSMCC_B:
+		return "DVB_ES_TYPE_DSMCC_B"
+	case DVB_ES_TYPE_DSMCC_C:
+		return "DVB_ES_TYPE_DSMCC_C"
+	case DVB_ES_TYPE_DSMCC_D:
+		return "DVB_ES_TYPE_DSMCC_D"
+	case DVB_ES_TYPE_MPEG2_AUX:
+		return "DVB_ES_TYPE_MPEG2_AUX"
+	case DVB_ES_TYPE_AAC:
+		return "DVB_ES_TYPE_AAC"
+	case DVB_ES_TYPE_MPEG4_VIDEO:
+		return "DVB_ES_TYPE_MPEG4_VIDEO"
+	case DVB_ES_TYPE_MPEG4_AUDIO:
+		return "DVB_ES_TYPE_MPEG4_AUDIO"
+	case DVB_ES_TYPE_H264_VIDEO:
+		return "DVB_ES_TYPE_H264_VIDEO"
+	case DVB_ES_TYPE_H265_VIDEO:
+		return "DVB_ES_TYPE_H265_VIDEO"
+	default:
+		return fmt.Sprintf("[?? Invalid DVBStreamType value %02X]", uint8(v))
 	}
 }

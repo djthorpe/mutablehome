@@ -10,8 +10,10 @@
 package dvb
 
 import (
+	"encoding/hex"
 	"fmt"
 	"os"
+	"time"
 	"unsafe"
 )
 
@@ -60,7 +62,7 @@ type (
 	DMXSectionFilter struct {
 		Pid     uint16
 		Pattern DMXPattern
-		Timeout uint32
+		Timeout uint32 // Seconds, or zero for no timeout
 		Flags   DMXFlags
 	}
 )
@@ -81,11 +83,11 @@ const (
 )
 
 const (
-	DMX_PES_AUDIO DMXStreamType = iota
-	DVB_DMX_PES_VIDEO
-	DVB_DMX_PES_TELETEXT
-	DVB_DMX_PES_SUBTITLE
-	DVB_DMX_PES_PCR
+	DVB_DMX_PES_AUDIO0 DMXStreamType = iota
+	DVB_DMX_PES_VIDEO0
+	DVB_DMX_PES_TELETEXT0
+	DVB_DMX_PES_SUBTITLE0
+	DVB_DMX_PES_PCR0
 	DVB_DMX_PES_AUDIO1
 	DVB_DMX_PES_VIDEO1
 	DVB_DMX_PES_TELETEXT1
@@ -105,10 +107,10 @@ const (
 )
 
 const (
-	DVB_DMX_FLAG_NONE DMXFlags = iota
-	DVB_DMX_FLAG_CHECK_CRC
-	DVB_DMX_FLAG_ONESHOT
-	DVB_DMX_FLAG_IMMEDIATE_START
+	DVB_DMX_FLAG_NONE            DMXFlags = 0
+	DVB_DMX_FLAG_CHECK_CRC       DMXFlags = 1
+	DVB_DMX_FLAG_ONESHOT         DMXFlags = 2
+	DVB_DMX_FLAG_IMMEDIATE_START DMXFlags = 4
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -133,6 +135,10 @@ func DVB_DMXPath(bus, demux uint) string {
 	return fmt.Sprintf("%v%v/demux%v", DVB_PATH_WILDCARD, bus, demux)
 }
 
+func DVB_DVRPath(bus, demux uint) string {
+	return fmt.Sprintf("%v%v/dvr%v", DVB_PATH_WILDCARD, bus, demux)
+}
+
 func DVB_DMXOpen(bus, demux uint) (*os.File, error) {
 	if file, err := os.OpenFile(DVB_DMXPath(bus, demux), os.O_SYNC|os.O_RDWR, 0); err != nil {
 		return nil, err
@@ -141,9 +147,17 @@ func DVB_DMXOpen(bus, demux uint) (*os.File, error) {
 	}
 }
 
+func DVB_DVROpen(bus, demux uint) (*os.File, error) {
+	if file, err := os.OpenFile(DVB_DVRPath(bus, demux), os.O_SYNC|os.O_RDWR, 0); err != nil {
+		return nil, err
+	} else {
+		return file, nil
+	}
+}
+
 func DVB_DMXStart(fd uintptr) error {
 	if err := dvb_ioctl(fd, DVB_DMX_START, unsafe.Pointer(nil)); err != 0 {
-		return os.NewSyscallError("dvb_ioctl", err)
+		return os.NewSyscallError("DVB_DMX_START", err)
 	} else {
 		return nil
 	}
@@ -151,7 +165,7 @@ func DVB_DMXStart(fd uintptr) error {
 
 func DVB_DMXStop(fd uintptr) error {
 	if err := dvb_ioctl(fd, DVB_DMX_STOP, unsafe.Pointer(nil)); err != 0 {
-		return os.NewSyscallError("dvb_ioctl", err)
+		return os.NewSyscallError("DVB_DMX_STOP", err)
 	} else {
 		return nil
 	}
@@ -159,7 +173,7 @@ func DVB_DMXStop(fd uintptr) error {
 
 func DVB_DMXSetBufferSize(fd uintptr, size uint32) error {
 	if err := dvb_ioctl(fd, DVB_DMX_SET_BUFFER_SIZE, unsafe.Pointer(uintptr(size))); err != 0 {
-		return os.NewSyscallError("dvb_ioctl", err)
+		return os.NewSyscallError("DVB_DMX_SET_BUFFER_SIZE", err)
 	} else {
 		return nil
 	}
@@ -167,7 +181,7 @@ func DVB_DMXSetBufferSize(fd uintptr, size uint32) error {
 
 func DVB_DMXSetSectionFilter(fd uintptr, filter DMXSectionFilter) error {
 	if err := dvb_ioctl(fd, DVB_DMX_SET_FILTER, unsafe.Pointer(&filter)); err != 0 {
-		return os.NewSyscallError("dvb_ioctl", err)
+		return os.NewSyscallError("DVB_DMX_SET_FILTER", err)
 	} else {
 		return nil
 	}
@@ -175,23 +189,23 @@ func DVB_DMXSetSectionFilter(fd uintptr, filter DMXSectionFilter) error {
 
 func DVB_DMXSetStreamFilter(fd uintptr, filter DMXStreamFilter) error {
 	if err := dvb_ioctl(fd, DVB_DMX_SET_PES_FILTER, unsafe.Pointer(&filter)); err != 0 {
-		return os.NewSyscallError("dvb_ioctl", err)
+		return os.NewSyscallError("DVB_DMX_SET_PES_FILTER", err)
 	} else {
 		return nil
 	}
 }
 
 func DVB_DMXAddPid(fd uintptr, pid uint16) error {
-	if err := dvb_ioctl(fd, DVB_DMX_ADD_PID, unsafe.Pointer(uintptr(pid))); err != 0 {
-		return os.NewSyscallError("dvb_ioctl", err)
+	if err := dvb_ioctl(fd, DVB_DMX_ADD_PID, unsafe.Pointer(&pid)); err != 0 {
+		return os.NewSyscallError("DVB_DMX_ADD_PID", err)
 	} else {
 		return nil
 	}
 }
 
 func DVB_DMXRemovePid(fd uintptr, pid uint16) error {
-	if err := dvb_ioctl(fd, DVB_DMX_REMOVE_PID, unsafe.Pointer(uintptr(pid))); err != 0 {
-		return os.NewSyscallError("dvb_ioctl", err)
+	if err := dvb_ioctl(fd, DVB_DMX_REMOVE_PID, unsafe.Pointer(&pid)); err != 0 {
+		return os.NewSyscallError("DVB_DMX_REMOVE_PID", err)
 	} else {
 		return nil
 	}
@@ -200,7 +214,7 @@ func DVB_DMXRemovePid(fd uintptr, pid uint16) error {
 func DVB_DMXGetStreamPids(fd uintptr) (map[DMXStreamType]uint16, error) {
 	var pids [5]uint16
 	if err := dvb_ioctl(fd, DVB_DMX_GET_PES_PIDS, unsafe.Pointer(&pids)); err != 0 {
-		return nil, os.NewSyscallError("dvb_ioctl", err)
+		return nil, os.NewSyscallError("DVB_DMX_GET_PES_PIDS", err)
 	}
 	pidmap := make(map[DMXStreamType]uint16)
 	for stream, pid := range pids {
@@ -214,18 +228,28 @@ func DVB_DMXGetStreamPids(fd uintptr) (map[DMXStreamType]uint16, error) {
 ////////////////////////////////////////////////////////////////////////////////
 // STRINGIFY
 
+func (f DMXSectionFilter) String() string {
+	return "<DVBSectionFilter" +
+		fmt.Sprintf(" pid=0x%04X", f.Pid) +
+		fmt.Sprintf(" timeout=%v", time.Second*time.Duration(f.Timeout)) +
+		fmt.Sprintf(" filter=%s", hex.EncodeToString(f.Pattern.Filter[:])) +
+		fmt.Sprintf(" mask=%s", hex.EncodeToString(f.Pattern.Mask[:])) +
+		fmt.Sprintf(" flags=%v", f.Flags) +
+		">"
+}
+
 func (s DMXStreamType) String() string {
 	switch s {
-	case DMX_PES_AUDIO:
-		return "DMX_PES_AUDIO"
-	case DVB_DMX_PES_VIDEO:
-		return "DVB_DMX_PES_VIDEO"
-	case DVB_DMX_PES_TELETEXT:
-		return "DVB_DMX_PES_TELETEXT"
-	case DVB_DMX_PES_SUBTITLE:
-		return "DVB_DMX_PES_SUBTITLE"
-	case DVB_DMX_PES_PCR:
-		return "DVB_DMX_PES_PCR"
+	case DVB_DMX_PES_AUDIO0:
+		return "DMX_PES_AUDIO0"
+	case DVB_DMX_PES_VIDEO0:
+		return "DVB_DMX_PES_VIDEO0"
+	case DVB_DMX_PES_TELETEXT0:
+		return "DVB_DMX_PES_TELETEXT0"
+	case DVB_DMX_PES_SUBTITLE0:
+		return "DVB_DMX_PES_SUBTITLE0"
+	case DVB_DMX_PES_PCR0:
+		return "DVB_DMX_PES_PCR0"
 	case DVB_DMX_PES_AUDIO1:
 		return "DVB_DMX_PES_AUDIO1"
 	case DVB_DMX_PES_VIDEO1:
@@ -259,6 +283,21 @@ func (s DMXStreamType) String() string {
 	case DVB_DMX_PES_OTHER:
 		return "DVB_DMX_PES_OTHER"
 	default:
-		return "[?? Invalid DMXStreamType]"
+		return fmt.Sprintf("[?? Invalid DMXStreamType %02X]", uint8(s))
+	}
+}
+
+func (f DMXFlags) String() string {
+	switch f {
+	case DVB_DMX_FLAG_NONE:
+		return "DVB_DMX_FLAG_NONE"
+	case DVB_DMX_FLAG_CHECK_CRC:
+		return "DVB_DMX_FLAG_CHECK_CRC"
+	case DVB_DMX_FLAG_ONESHOT:
+		return "DVB_DMX_FLAG_ONESHOT"
+	case DVB_DMX_FLAG_IMMEDIATE_START:
+		return "DVB_DMX_FLAG_IMMEDIATE_START"
+	default:
+		return "[?? Invalid DMXFlags value]"
 	}
 }
