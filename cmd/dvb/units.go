@@ -34,6 +34,8 @@ func main() {
 	if app, err := app.NewCommandLineTool(Main, Events, "mutablehome/dvb/table", "mutablehome/dvb/frontend", "mutablehome/dvb/demux"); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	} else {
+		app.Flags().FlagString("dvb.name", "", "DVB Transmitter")
+
 		// Run and exit
 		os.Exit(app.Run())
 	}

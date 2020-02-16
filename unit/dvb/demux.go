@@ -8,10 +8,8 @@
 package dvb
 
 import (
-	"fmt"
 	"os"
 	"sync"
-	"time"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi/v2"
@@ -37,6 +35,7 @@ type demux struct {
 	filepoll       gopi.FilePoll
 	bus            gopi.Bus
 	sectionfilter  map[uintptr]*SectionFilter
+	streamfilter   *StreamFilter
 
 	base.Unit
 	sync.RWMutex
@@ -103,6 +102,13 @@ func (this *demux) Close() error {
 	defer this.RWMutex.Unlock()
 
 	errs := gopi.NewCompoundError()
+
+	if this.streamfilter != nil {
+		errs.Add(this.filepoll.Unwatch(this.streamfilter.Fd()))
+		errs.Add(this.streamfilter.Close())
+		this.streamfilter = nil
+	}
+
 	for fd, filter := range this.sectionfilter {
 		errs.Add(this.filepoll.Unwatch(fd))
 		errs.Add(filter.Close())
@@ -111,6 +117,7 @@ func (this *demux) Close() error {
 
 	// Release resources
 	this.sectionfilter = nil
+	this.streamfilter = nil
 	this.frontend = nil
 
 	// Return success
@@ -187,6 +194,12 @@ func (this *demux) DestroyFilter(filter mutablehome.DVBFilter) error {
 
 	if fd := filter.Fd(); fd == 0 {
 		return gopi.ErrBadParameter.WithPrefix("filter")
+	} else if filter_, ok := filter.(*StreamFilter); ok && filter_ == this.streamfilter {
+		errs := gopi.NewCompoundError()
+		errs.Add(this.filepoll.Unwatch(fd))
+		errs.Add(filter_.Close())
+		this.streamfilter = nil
+		return errs.ErrorOrSelf()
 	} else if filter_, exists := this.sectionfilter[fd]; exists == false {
 		return gopi.ErrBadParameter.WithPrefix("filter")
 	} else {
@@ -202,7 +215,9 @@ func (this *demux) NewStreamFilter(pids []uint16) (mutablehome.DVBFilter, error)
 	this.RWMutex.Lock()
 	defer this.RWMutex.Unlock()
 
-	if len(pids) == 0 {
+	if this.streamfilter != nil {
+		return nil, gopi.ErrOutOfOrder.WithPrefix("filter")
+	} else if len(pids) == 0 {
 		return nil, gopi.ErrBadParameter.WithPrefix("pids")
 	} else if filter, err := NewStreamFilter(this.adapter, this.demux, pids[0], dvb.DVB_DMX_IN_FRONTEND, dvb.DVB_DMX_OUT_TSDEMUX_TAP, dvb.DVB_DMX_PES_OTHER); err != nil {
 		return nil, err
@@ -215,14 +230,15 @@ func (this *demux) NewStreamFilter(pids []uint16) (mutablehome.DVBFilter, error)
 	} else if err := this.filepoll.Watch(filter.Fd(), gopi.FILEPOLL_FLAG_READ, this.Read); err != nil {
 		filter.Close()
 		return nil, err
-	} else if err := filter.Start(); err != nil {
-		filter.Close()
-		return nil, err
 	} else {
-		time.Sleep(1 * time.Second)
-		fmt.Println(dvb.DVB_DMXGetStreamPids(filter.Fd()))
-
-		return filter, nil
+		this.streamfilter = filter
+		if err := filter.Start(); err != nil {
+			filter.Close()
+			this.streamfilter = nil
+			return nil, err
+		} else {
+			return filter, nil
+		}
 	}
 }
 
@@ -239,11 +255,30 @@ func (this *demux) sectionFilterForFd(fd uintptr) *SectionFilter {
 	}
 }
 
+func (this *demux) streamFilterForFd(fd uintptr) *StreamFilter {
+	//this.RWMutex.RLock()
+	//defer this.RWMutex.RUnlock()
+	if this.streamfilter == nil {
+		return nil
+	} else if this.streamfilter.Fd() == fd {
+		return this.streamfilter
+	} else {
+		return nil
+	}
+}
+
 func (this *demux) Read(fd uintptr, flags gopi.FilePollFlags) {
 	if flags&gopi.FILEPOLL_FLAG_READ == gopi.FILEPOLL_FLAG_READ {
-		if filter := this.sectionFilterForFd(fd); filter != nil {
+		if filter := this.streamFilterForFd(fd); filter != nil {
+			if buf, err := NewTSReaderRead(fd, TS_PACKET_LENGTH*4); err != nil {
+				this.Log.Warn("Stream Read error:", err)
+			} else {
+				this.Log.Debug("buf=", buf.Size(), "bytes")
+			}
+			return
+		} else if filter := this.sectionFilterForFd(fd); filter != nil {
 			if section, err := TSRead(fd); err != nil {
-				this.Log.Warn("Read error:", err)
+				this.Log.Warn("Section Read error:", err)
 				return
 			} else {
 				this.bus.Emit(NewSectionEvent(this, filter, section))

@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	// Frameworks
@@ -22,17 +23,35 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 
 func Main(app gopi.App, args []string) error {
-	table := app.UnitInstance("mutablehome/dvb/table").(home.DVBTable)
 	frontend := app.UnitInstance("mutablehome/dvb/frontend").(home.DVBFrontend)
 	demux := app.UnitInstance("mutablehome/dvb/demux").(home.DVBDemux)
 
-	prop := table.Properties()
-	if len(prop) == 0 {
-		return gopi.ErrNotFound
+	// Obtain tuning parameters
+	key := app.Flags().GetString("dvb.name", gopi.FLAG_NS_DEFAULT)
+	props, err := GetTransmitters(app, key)
+	if err != nil {
+		return err
 	}
 
-	// Get pids
+	if len(props) != 1 {
+		props, _ := GetTransmitters(app, "")
+		names := ""
+		for _, prop := range props {
+			names += strconv.Quote(prop.Name()) + ","
+		}
+		return fmt.Errorf("Use -dvb.name argument to select from %v", strings.TrimSuffix(names, ","))
+	}
+
+	// Tune
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	fmt.Println("Tune", props[0].Name(), "frequency=", props[0].Frequency(), "Hz")
+	if err := frontend.Tune(ctx, props[0]); err != nil {
+		return err
+	}
+
 	if len(args) > 0 {
+		// Stream
 		if pids, err := GetPids(args); err != nil {
 			return err
 		} else if filter, err := demux.NewStreamFilter(pids); err != nil {
@@ -41,14 +60,6 @@ func Main(app gopi.App, args []string) error {
 			fmt.Println("filter=", filter)
 		}
 	} else {
-		// Tune
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-		defer cancel()
-		fmt.Println("Tune", prop[0].Name(), "frequency=", prop[0].Frequency(), "Hz")
-		if err := frontend.Tune(ctx, prop[0]); err != nil {
-			return err
-		}
-
 		// Initiate program association table (PAT) scanning
 		if _, err := demux.ScanPAT(); err != nil {
 			return err
@@ -87,6 +98,16 @@ func Main(app gopi.App, args []string) error {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+
+func GetTransmitters(app gopi.App, key string) ([]home.DVBProperties, error) {
+	table := app.UnitInstance("mutablehome/dvb/table").(home.DVBTable)
+
+	if props := table.Properties(key); len(props) == 0 {
+		return nil, gopi.ErrNotFound.WithPrefix("-dvb.name")
+	} else {
+		return props, nil
+	}
+}
 
 func GetPids(args []string) ([]uint16, error) {
 	pids := make([]uint16, len(args))

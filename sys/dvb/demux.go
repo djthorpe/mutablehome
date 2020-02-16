@@ -238,6 +238,16 @@ func (f DMXSectionFilter) String() string {
 		">"
 }
 
+func (f DMXStreamFilter) String() string {
+	return "<DVBStreamFilter" +
+		fmt.Sprintf(" pid=0x%04X", f.Pid) +
+		fmt.Sprintf(" in=%v", f.In) +
+		fmt.Sprintf(" out=%v", f.Out) +
+		fmt.Sprintf(" type=%s", f.Type) +
+		fmt.Sprintf(" flags=%v", f.Flags) +
+		">"
+}
+
 func (s DMXStreamType) String() string {
 	switch s {
 	case DVB_DMX_PES_AUDIO0:
@@ -299,5 +309,31 @@ func (f DMXFlags) String() string {
 		return "DVB_DMX_FLAG_IMMEDIATE_START"
 	default:
 		return "[?? Invalid DMXFlags value]"
+	}
+}
+
+func (f DMXInput) String() string {
+	switch f {
+	case DVB_DMX_IN_FRONTEND:
+		return "DVB_DMX_IN_FRONTEND"
+	case DVB_DMX_IN_DVR:
+		return "DVB_DMX_IN_DVR"
+	default:
+		return "[?? Invalid DMXInput value]"
+	}
+}
+
+func (f DMXOutput) String() string {
+	switch f {
+	case DVB_DMX_OUT_DECODER:
+		return "DVB_DMX_OUT_DECODER"
+	case DVB_DMX_OUT_TAP:
+		return "DVB_DMX_OUT_TAP"
+	case DVB_DMX_OUT_TS_TAP:
+		return "DVB_DMX_OUT_TS_TAP"
+	case DVB_DMX_OUT_TSDEMUX_TAP:
+		return "DVB_DMX_OUT_TSDEMUX_TAP"
+	default:
+		return "[?? Invalid DMXOutput value]"
 	}
 }

@@ -125,10 +125,21 @@ func (this *table) Decode(r io.Reader) ([]*section, error) {
 ////////////////////////////////////////////////////////////////////////////////
 // PROPERTIES
 
-func (this *table) Properties() []home.DVBProperties {
-	props := make([]home.DVBProperties, len(this.sections))
-	for i, section := range this.sections {
-		props[i] = section
+func (this *table) Properties(key string) []home.DVBProperties {
+	keyMap := make(map[string]bool)
+	for _, keyValue := range strings.Split(strings.TrimSpace(key), ",") {
+		keyMap[keyValue] = true
+	}
+	props := make([]home.DVBProperties, 0, len(this.sections))
+	for _, section := range this.sections {
+		// Filter by key
+		if len(keyMap) > 0 {
+			if _, exists := keyMap[section.name]; exists == false {
+				continue
+			}
+		}
+		// Add property
+		props = append(props, section)
 	}
 	return props
 }

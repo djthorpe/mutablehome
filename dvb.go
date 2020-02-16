@@ -97,9 +97,11 @@ type DVBSection interface {
 }
 
 type DVBTable interface {
-	// Properties returns an array of DVB Properties
-	// which define one or more signal sources
-	Properties() []DVBProperties
+	// Properties returns an array of DVB Properties which define a
+	// setof transmitter parameters. The argument can be empty to return
+	// all parameters, or will return properties that match comma-delimited
+	// set of names
+	Properties(string) []DVBProperties
 
 	// Implements gopi.Unit
 	gopi2.Unit
