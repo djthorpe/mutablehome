@@ -64,22 +64,21 @@ func Main(app gopi.App, args []string) error {
 		if _, err := demux.ScanPAT(); err != nil {
 			return err
 		}
-		/*
-			// Initiate service description table (SDT) scanning
-			if _, err := demux.ScanSDT(false); err != nil {
-				return err
-			}
-			if _, err := demux.ScanSDT(true); err != nil {
-				return err
-			}
-			// Initiate network information table (NIT) scanning
-			if _, err := demux.ScanNIT(false); err != nil {
-				return err
-			}
-			if _, err := demux.ScanNIT(true); err != nil {
-				return err
-			}
-		*/ // Initiate event information (now/next) scanning
+		// Initiate service description table (SDT) scanning
+		if _, err := demux.ScanSDT(false); err != nil {
+			return err
+		}
+		if _, err := demux.ScanSDT(true); err != nil {
+			return err
+		}
+		// Initiate network information table (NIT) scanning
+		if _, err := demux.ScanNIT(false); err != nil {
+			return err
+		}
+		if _, err := demux.ScanNIT(true); err != nil {
+			return err
+		}
+		// Initiate event information (now/next) scanning
 		/*
 			if _, err := demux.ScanEITNowNext(false); err != nil {
 				return err
@@ -133,29 +132,29 @@ func DVBSectionEventHandler(ctx context.Context, app gopi.App, evt gopi.Event) {
 	switch section.Type() {
 	case home.DVB_TS_TABLE_PAT:
 		// Stop Filter
-		if err := demux.DestroyFilter(filter); err != nil {
+		if err := filter.Stop(); err != nil {
 			app.Log().Error(err)
 		}
-		// Scan for Program map specific data (PMT)
+		// Scan for Program map specific data (PMT) for each program
 		if _, err := demux.ScanPMT(section); err != nil {
 			app.Log().Error(err)
 		}
 	case home.DVB_TS_TABLE_PMT:
 		fmt.Println(section)
 		// Stop Filter
-		if err := demux.DestroyFilter(filter); err != nil {
+		if err := filter.Stop(); err != nil {
 			app.Log().Error(err)
 		}
 	case home.DVB_TS_TABLE_SDT, home.DVB_TS_TABLE_SDT_OTHER:
 		fmt.Println(section)
 		// Stop Filter
-		if err := demux.DestroyFilter(filter); err != nil {
+		if err := filter.Stop(); err != nil {
 			app.Log().Error(err)
 		}
 	case home.DVB_TS_TABLE_NIT, home.DVB_TS_TABLE_NIT_OTHER:
 		fmt.Println(section)
 		// Stop Filter
-		if err := demux.DestroyFilter(filter); err != nil {
+		if err := filter.Stop(); err != nil {
 			app.Log().Error(err)
 		}
 	case home.DVB_TS_TABLE_EIT, home.DVB_TS_TABLE_EIT_OTHER:

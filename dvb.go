@@ -72,7 +72,7 @@ type DVBDemux interface {
 	// to true looks for EIT sections for other transponders
 	ScanEITNowNext(bool) (DVBFilter, error)
 
-	// New Stream Filter
+	// New Stream Filter with list of pids to filter on
 	NewStreamFilter([]uint16) (DVBFilter, error)
 
 	// Close filter

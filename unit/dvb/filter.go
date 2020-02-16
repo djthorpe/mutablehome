@@ -49,7 +49,6 @@ func NewSectionFilter(adapter, demux uint, pid uint16, tid home.DVBTableType) (*
 			dvb.DMXSectionFilter{
 				Pid:     pid,
 				Timeout: 0,
-				Flags:   dvb.DVB_DMX_FLAG_IMMEDIATE_START,
 			},
 		}
 		filter.DMXSectionFilter.Pattern.Filter[0] = uint8(tid)
