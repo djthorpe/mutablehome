@@ -55,6 +55,42 @@ func (this lightbulb) Temperature() uint16 {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// EQUALS
+
+func (this lightbulb) Equals(other lightbulb) bool {
+	if this.Power_ != other.Power_ {
+		return false
+	}
+	if this.ColorHex_ != other.ColorHex_ {
+		return false
+	}
+	if this.ColorX_ != other.ColorX_ {
+		return false
+	}
+	if this.ColorY_ != other.ColorY_ {
+		return false
+	}
+	if this.Brightness_ != other.Brightness_ {
+		return false
+	}
+	if this.Temperature_ != other.Temperature_ {
+		return false
+	}
+	if this.TransitionTime_ != other.TransitionTime_ {
+		return false
+	}
+	if this.Hue_ != other.Hue_ {
+		return false
+	}
+	if this.Saturation_ != other.Saturation_ {
+		return false
+	}
+
+	// All equals
+	return true
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // SET PROPERTIES
 
 func (this lightbulb) SetPower(state bool) mutablehome.IkeaCommand {

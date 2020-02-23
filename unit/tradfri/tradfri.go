@@ -34,15 +34,18 @@ type Tradfri struct {
 	Key     string
 	Path    string
 	Timeout time.Duration
+	Bus     gopi.Bus
 }
 
 type tradfri struct {
 	log     gopi.Logger
+	bus     gopi.Bus
 	id      string
 	key     string
 	path    string
 	timeout time.Duration
 	conn    *coap.ClientConn
+	devices map[uint]*device
 
 	Token
 	base.Unit
@@ -80,6 +83,13 @@ func (this *tradfri) Init(config Tradfri) error {
 	this.id = config.Id
 	this.key = config.Key
 
+	// Check for bus
+	if config.Bus == nil {
+		return gopi.ErrBadParameter.WithPrefix("bus")
+	} else {
+		this.bus = config.Bus
+	}
+
 	// Set timeout
 	if config.Timeout == 0 {
 		this.timeout = CONN_TIMEOUT
@@ -95,6 +105,9 @@ func (this *tradfri) Init(config Tradfri) error {
 	} else {
 		this.path = path
 	}
+
+	// Create empty devices map
+	this.devices = make(map[uint]*device)
 
 	// Success
 	return nil
@@ -113,9 +126,11 @@ func (this *tradfri) Close() error {
 
 	// Release resources
 	this.conn = nil
+	this.devices = nil
+	this.bus = nil
 
 	// Success
-	return nil
+	return this.Unit.Close()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -212,6 +227,9 @@ func (this *tradfri) Scenes() ([]uint, error) {
 }
 
 func (this *tradfri) Device(id uint) (mutablehome.IkeaDevice, error) {
+	this.Mutex.Lock()
+	defer this.Mutex.Unlock()
+
 	device := NewDevice()
 	if err := this.requestObjForPathId(PATH_DEVICES, id, device); err != nil {
 		return nil, err
@@ -221,6 +239,9 @@ func (this *tradfri) Device(id uint) (mutablehome.IkeaDevice, error) {
 }
 
 func (this *tradfri) Group(id uint) (mutablehome.IkeaGroup, error) {
+	this.Mutex.Lock()
+	defer this.Mutex.Unlock()
+
 	group := NewGroup()
 	if err := this.requestObjForPathId(PATH_GROUPS, id, group); err != nil {
 		return nil, err
@@ -233,6 +254,9 @@ func (this *tradfri) Group(id uint) (mutablehome.IkeaGroup, error) {
 // SEND COMMANDS TO GATEWAY
 
 func (this *tradfri) Send(commands ...mutablehome.IkeaCommand) error {
+	this.Mutex.Lock()
+	defer this.Mutex.Unlock()
+
 	if len(commands) == 0 {
 		return gopi.ErrBadParameter.WithPrefix("values")
 	}
@@ -243,10 +267,11 @@ func (this *tradfri) Send(commands ...mutablehome.IkeaCommand) error {
 			return gopi.ErrBadParameter.WithPrefix("command")
 		} else if message, err := this.conn.Put(command.Path(), coap.AppJSON, body); err != nil {
 			return err
-		} else {
-			fmt.Println(message)
+		} else if message.Code() != codes.Changed {
+			return fmt.Errorf("%w: %v (path: %v)", gopi.ErrUnexpectedResponse, message.Code(), message.Path())
 		}
 	}
+
 	// Success
 	return nil
 }
@@ -293,11 +318,37 @@ FOR_LOOP:
 func (this *tradfri) observeDeviceCallback(response *coap.Request) {
 	device := NewDevice()
 	if response.Msg.Code() != codes.Content {
-		this.Log.Warn(fmt.Errorf("%w: %v", gopi.ErrUnexpectedResponse, response.Msg.Code())
+		this.Log.Error(fmt.Errorf("%w: %v", gopi.ErrUnexpectedResponse, response.Msg.Code()))
+		return
 	} else if err := json.Unmarshal(response.Msg.Payload(), &device); err != nil {
-		this.Log.Warn(fmt.Errorf("%w: %v", gopi.ErrUnexpectedResponse,err))
+		this.Log.Error(fmt.Errorf("%w: %v", gopi.ErrUnexpectedResponse, err))
+		return
+	}
+
+	// Emit device event if there is a change
+	if event := this.observeDeviceEvent(device); event != mutablehome.IKEA_EVENT_NONE {
+		this.bus.Emit(NewEvent(this, event, device))
+	}
+}
+
+func (this *tradfri) observeDeviceEvent(device *device) mutablehome.IkeaEventType {
+	this.Mutex.Lock()
+	defer this.Mutex.Unlock()
+
+	if device == nil || device.Id() == 0 {
+		return mutablehome.IKEA_EVENT_NONE
+	}
+
+	// Check for added devices
+	id := device.Id()
+	if other, exists := this.devices[id]; exists == false {
+		this.devices[id] = device
+		return mutablehome.IKEA_EVENT_DEVICE_ADDED
+	} else if device.Equals(other) == false {
+		this.devices[id] = device
+		return mutablehome.IKEA_EVENT_DEVICE_CHANGED
 	} else {
-		fmt.Println("Got", device)
+		return mutablehome.IKEA_EVENT_NONE
 	}
 }
 

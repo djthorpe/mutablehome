@@ -93,6 +93,61 @@ func (this *device) Lights() []mutablehome.IkeaLight {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// EQUALS
+
+func (this *device) Equals(other *device) bool {
+	if this.Name_ != other.Name_ {
+		return false
+	}
+	if this.Created_ != other.Created_ {
+		return false
+	}
+	if this.Updated_ != other.Updated_ {
+		return false
+	}
+	if this.Id_ != other.Id_ {
+		return false
+	}
+	if this.Active_ != other.Active_ {
+		return false
+	}
+	if this.Type_ != other.Type_ {
+		return false
+	}
+	if this.NeedsUpdate_ != other.NeedsUpdate_ {
+		return false
+	}
+	if this.Metadata_.Vendor != other.Metadata_.Vendor {
+		return false
+	}
+	if this.Metadata_.Product != other.Metadata_.Product {
+		return false
+	}
+	if this.Metadata_.Serial != other.Metadata_.Serial {
+		return false
+	}
+	if this.Metadata_.Version != other.Metadata_.Version {
+		return false
+	}
+	if this.Metadata_.PowerSource != other.Metadata_.PowerSource {
+		return false
+	}
+	if this.Metadata_.BatteryLevel != other.Metadata_.BatteryLevel {
+		return false
+	}
+	if len(this.Lights_) != len(other.Lights_) {
+		return false
+	}
+	for i, light := range this.Lights_ {
+		if light.Equals(other.Lights_[i]) == false {
+			return false
+		}
+	}
+	// Otherwise, all equal
+	return true
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // STRINGIFY
 
 func (this *device) String() string {
@@ -105,6 +160,10 @@ func (this *device) String() string {
 	switch this.Type() {
 	case mutablehome.IKEA_DEVICE_TYPE_LIGHT:
 		str += " lights=" + fmt.Sprint(this.Lights())
+	}
+
+	if this.Metadata_.BatteryLevel != 0 {
+		str += " batterylevel=" + fmt.Sprint(this.Metadata_.BatteryLevel)
 	}
 
 	if created := this.Created(); created.IsZero() == false {
@@ -122,5 +181,6 @@ func (this *device) String() string {
 	if version := this.Version(); version != "" {
 		str += " version=" + strconv.Quote(version)
 	}
+
 	return str + ">"
 }

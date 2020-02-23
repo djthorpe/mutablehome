@@ -14,7 +14,8 @@ import (
 
 func init() {
 	gopi.UnitRegister(gopi.UnitConfig{
-		Name: Tradfri{}.Name(),
+		Name:     Tradfri{}.Name(),
+		Requires: []string{"bus"},
 		Config: func(app gopi.App) error {
 			app.Flags().FlagString("tradfri.id", "", "Unique identifier")
 			app.Flags().FlagString("tradfri.key", "", "Security code")
@@ -28,6 +29,7 @@ func init() {
 				Key:     app.Flags().GetString("tradfri.key", gopi.FLAG_NS_DEFAULT),
 				Path:    app.Flags().GetString("tradfri.path", gopi.FLAG_NS_DEFAULT),
 				Timeout: app.Flags().GetDuration("tradfri.timeout", gopi.FLAG_NS_DEFAULT),
+				Bus:     app.Bus(),
 			}, app.Log().Clone(Tradfri{}.Name()))
 		},
 	})

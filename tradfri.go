@@ -19,7 +19,10 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 // IKEA TRADFRI
 
-type IkeaDeviceType uint
+type (
+	IkeaDeviceType uint
+	IkeaEventType  uint
+)
 
 type Ikea interface {
 	// Connect to gateway, using either IP4 or IP6
@@ -40,7 +43,7 @@ type Ikea interface {
 	// Send one or more device, group or scene commands
 	Send(...IkeaCommand) error
 
-	// Observe devices
+	// Observe device
 	ObserveDevice(context.Context, uint) error
 
 	// Implements Unit
@@ -85,6 +88,13 @@ type IkeaCommand interface {
 	Body() (io.Reader, error)
 }
 
+type IkeaEvent interface {
+	Type() IkeaEventType
+	Device() IkeaDevice
+
+	gopi.Event
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // CONSTANTS
 
@@ -100,6 +110,12 @@ const (
 	IKEA_DEVICE_TYPE_MOTIONSENSOR IkeaDeviceType = 4
 	IKEA_DEVICE_TYPE_REPEATER     IkeaDeviceType = 6
 	IKEA_DEVICE_TYPE_BLIND        IkeaDeviceType = 7
+)
+
+const (
+	IKEA_EVENT_NONE IkeaEventType = iota
+	IKEA_EVENT_DEVICE_ADDED
+	IKEA_EVENT_DEVICE_CHANGED
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -123,5 +139,18 @@ func (t IkeaDeviceType) String() string {
 		return "IKEA_DEVICE_TYPE_BLIND"
 	default:
 		return "[?? Invalid IkeaDeviceType value]"
+	}
+}
+
+func (t IkeaEventType) String() string {
+	switch t {
+	case IKEA_EVENT_NONE:
+		return "IKEA_EVENT_NONE"
+	case IKEA_EVENT_DEVICE_ADDED:
+		return "IKEA_EVENT_DEVICE_ADDED"
+	case IKEA_EVENT_DEVICE_CHANGED:
+		return "IKEA_EVENT_DEVICE_CHANGED"
+	default:
+		return "[?? Invalid IkeaEventType value]"
 	}
 }
