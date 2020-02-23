@@ -14,12 +14,13 @@ GOLDFLAGS += -X $(GOPI).GitHash=$(shell git rev-parse HEAD)
 GOLDFLAGS += -X $(GOPI).GoBuildTime=$(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 GOFLAGS = -ldflags "-s -w $(GOLDFLAGS)" 
 
-PKG_CONFIG_PATH_DARWIN=/usr/local/Cellar/libcoap/4.2.1/lib/pkgconfig
+all: ecovacs tradfri
 
-darwin: test-darwin
+ecovacs:
+	$(GOINSTALL) $(GOFLAGS) ./cmd/ecovacs
 
-test-darwin:
-	PKG_CONFIG_PATH=$(PKG_CONFIG_PATH_DARWIN) $(GOTEST) -v ./libcoap2/...
+tradfri:
+	$(GOINSTALL) $(GOFLAGS) ./cmd/tradfri
 
 clean: 
 	$(GOCLEAN)

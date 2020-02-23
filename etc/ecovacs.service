@@ -1,0 +1,16 @@
+[Unit]
+Description=Ecovacs Deebot Service
+Documentation=https://github.com/djthorpe/mutablehome
+After=network-online.service
+
+[Service]
+EnvironmentFile=/opt/gaffer/etc/ecovacs.env
+User=${ECOVACS_USER}
+ExecStart=/opt/gaffer/sbin/ecovacs \
+  -ecovacs.email=${ECOVACS_EMAIL} \
+  -ecovacs.password=${ECOVACS_PASSWORD} \
+  -mqtt.broker=${MQTT_BROKER}
+RestartSec=60s
+
+[Install]
+WantedBy=default.target
