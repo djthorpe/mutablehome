@@ -15,8 +15,8 @@ import (
 
 var (
 	Events = []gopi.EventHandler{
-		gopi.EventHandler{Name: "mutablehome.EcovacsEvent", Handler: PrintEvent},
-		gopi.EventHandler{Name: "mutablehome.EcovacsEvent", Handler: LogEvent},
+		gopi.EventHandler{Name: "ecovacs.Event", Handler: PrintEvent},
+		//gopi.EventHandler{Name: "mutablehome.EcovacsEvent", Handler: LogEvent},
 	}
 	Header sync.Once
 )
@@ -34,6 +34,7 @@ func PrintEvent(_ context.Context, _ gopi.App, evt_ gopi.Event) {
 	fmt.Printf("%-15s %-40s\n", type_, value_)
 }
 
+/*
 func LogEvent(ctx context.Context, app gopi.App, evt_ gopi.Event) {
 	influxdb := app.UnitInstance("influxdb/v1").(mutablehome.InfluxDB)
 	evt := evt_.(mutablehome.EcovacsEvent)
@@ -97,3 +98,4 @@ func LogEvent(ctx context.Context, app gopi.App, evt_ gopi.Event) {
 		app.Log().Error(err)
 	}
 }
+*/

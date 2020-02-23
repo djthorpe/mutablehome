@@ -1,0 +1,12 @@
+[Unit]
+Description=Ecovacs Deebot Service
+Documentation=https://github.com/djthorpe/mutablehome
+After=network-online.service
+
+[Service]
+User=REPLACE_ME
+ExecStart=/home/djt/bin/ecovacs -ecovacs.email REPLACE_ME -ecovacs.password REPLACE_ME
+RestartSec=60s
+
+[Install]
+WantedBy=default.target

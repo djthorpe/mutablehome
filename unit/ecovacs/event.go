@@ -32,7 +32,7 @@ func NewEvent(source home.Ecovacs, device home.EvovacsDevice, message *XMPPMessa
 // IMPLEMENTATION gopi.Event
 
 func (*EcovacsEvent) Name() string {
-	return "mutablehome.EcovacsEvent"
+	return "ecovacs.Event"
 }
 
 func (*EcovacsEvent) NS() gopi.EventNS {
