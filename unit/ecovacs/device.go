@@ -106,7 +106,7 @@ func (this *device) Disconnect() error {
 ////////////////////////////////////////////////////////////////////////////////
 // GET PROPERTIES
 
-func (this *device) DeviceId() string {
+func (this *device) Id() string {
 	return this.DeviceId_
 }
 

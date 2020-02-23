@@ -44,6 +44,7 @@ type EvovacsDevice interface {
 	// Return device properties
 	Address() string
 	Nickname() string
+	Id() string
 
 	// Fetch information from device, returns ReqId for the request
 	GetBatteryInfo() (string, error)

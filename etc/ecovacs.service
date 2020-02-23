@@ -4,8 +4,12 @@ Documentation=https://github.com/djthorpe/mutablehome
 After=network-online.service
 
 [Service]
-User=REPLACE_ME
-ExecStart=/home/djt/bin/ecovacs -ecovacs.email REPLACE_ME -ecovacs.password REPLACE_ME
+EnvironmentFile=/opt/gaffer/etc/ecovacs.env
+User=${ECOVACS_USER}
+ExecStart=/opt/gaffer/sbin/ecovacs \
+  -ecovacs.email=${ECOVACS_EMAIL} \
+  -ecovacs.password=${ECOVACS_PASSWORD} \
+  -mqtt.broker=${MQTT_BROKER}
 RestartSec=60s
 
 [Install]

@@ -20,6 +20,8 @@ func main() {
 	if app, err := app.NewCommandLineTool(Main, Events, "ecovacs", "mosquitto"); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	} else {
+		app.Flags().FlagString("topic", "ecovacs", "Root ecovacs topic")
+		app.Flags().FlagInt("qos", 1, "MQTT quality of service")
 		os.Exit(app.Run())
 	}
 }
