@@ -128,9 +128,17 @@ func (this lightbulb) SetTemperature(value uint16, transition time.Duration) mut
 func (this lightbulb) String() string {
 	str := "<ikea.Light" +
 		" power=" + fmt.Sprint(this.Power()) +
-		" brightness=" + fmt.Sprint(this.Brightness()) +
-		" color_hex=" + strconv.Quote(this.ColorHex())
+		" brightness=" + fmt.Sprint(this.Brightness())
+
+	// Set colorHex
+	if colorHex := this.ColorHex(); colorHex != "0" {
+		str += " color_hex=" + strconv.Quote(this.ColorHex())
+	}
+
+	// Set colorXY
 	x, y := this.ColorXY()
 	str += " color_xy=" + fmt.Sprintf("{%v,%v}", x, y)
+
+	// Return
 	return str + ">"
 }
