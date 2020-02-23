@@ -61,9 +61,6 @@ func (this lightbulb) Equals(other lightbulb) bool {
 	if this.Power_ != other.Power_ {
 		return false
 	}
-	if this.ColorHex_ != other.ColorHex_ {
-		return false
-	}
 	if this.ColorX_ != other.ColorX_ {
 		return false
 	}
