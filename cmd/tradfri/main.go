@@ -7,6 +7,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"sync"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi/v2"
@@ -15,6 +16,7 @@ import (
 
 var (
 	reHostPort = regexp.MustCompile("^([^\\:]+)\\:(\\d+)$")
+	wg         sync.WaitGroup
 )
 
 /////////////////////////////////////////////////////////////////////
@@ -43,10 +45,13 @@ func Main(app gopi.App, args []string) error {
 	fmt.Println("Press CTRL+C to end")
 	app.WaitForSignal(context.Background(), os.Interrupt)
 
-	// Cancel observing
+	// Cancel observing devices
 	for _, cancel := range cancels {
 		cancel()
 	}
+
+	// Wait for all goroutines to have ended
+	wg.Wait()
 
 	// Return success
 	return nil
@@ -91,10 +96,12 @@ func ObserveDevices(tradfri mutablehome.Ikea) ([]context.CancelFunc, error) {
 		cancels := make([]context.CancelFunc, 0, len(devices))
 		for _, device := range devices {
 			ctx, cancel := context.WithCancel(context.Background())
+			wg.Add(1)
 			go func(device uint) {
 				if err := tradfri.ObserveDevice(ctx, device); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
 					fmt.Println("ObserveDevice:", err)
 				}
+				wg.Done()
 			}(device)
 			cancels = append(cancels, cancel)
 		}

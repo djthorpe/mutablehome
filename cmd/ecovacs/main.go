@@ -36,20 +36,6 @@ func Main(app gopi.App, args []string) error {
 		}
 	}
 
-	/*
-			if _, err := device.Clean(mutablehome.ECOVACS_CLEAN_AUTO, mutablehome.ECOVACS_SUCTION_STRONG); err != nil {
-				return err
-			} else {
-				time.Sleep(10 * time.Second)
-			}
-			if _, err := device.Charge(); err != nil {
-				return err
-			} else {
-				time.Sleep(2 * time.Second)
-			}
-		}
-	*/
-
 	// Wait for CTRL+C
 	fmt.Println("Press CTRL+C to end")
 	app.WaitForSignal(context.Background(), os.Interrupt)

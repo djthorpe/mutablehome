@@ -118,11 +118,11 @@ func (this *tradfri) Close() error {
 	defer this.Mutex.Unlock()
 
 	// Close connection
-	if this.conn != nil {
-		if err := this.conn.Close(); err != nil {
-			return err
-		}
-	}
+	//if this.conn != nil {
+	//if err := this.conn.Close(); err != nil {
+	//	return err
+	//}
+	//}
 
 	// Release resources
 	this.conn = nil
