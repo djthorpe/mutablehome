@@ -8,10 +8,15 @@ import (
 	"regexp"
 	"strconv"
 	"sync"
+	"time"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi/v2"
 	mutablehome "github.com/djthorpe/mutablehome"
+)
+
+const (
+	TRADFRI_MDNS_SERVICE = "_coap._udp"
 )
 
 var (
@@ -24,14 +29,13 @@ var (
 func Main(app gopi.App, args []string) error {
 	tradfri := app.UnitInstance("tradfri").(mutablehome.Ikea)
 
-	if host, port, err := HostPort(app); err != nil {
+	if services, err := Services(app); err != nil {
 		return err
-	} else if addrs, err := LookupHost(host); err != nil {
-		return err
-	} else if err := tradfri.Connect(gopi.RPCServiceRecord{
-		Addrs: addrs,
-		Port:  uint16(port),
-	}, gopi.RPC_FLAG_INET_V4|gopi.RPC_FLAG_INET_V6); err != nil {
+	} else if len(services) == 0 {
+		return gopi.ErrNotFound.WithPrefix("Gateway")
+	} else if len(services) != 1 {
+		return gopi.ErrDuplicateItem.WithPrefix("Gateway")
+	} else if err := tradfri.Connect(services[0], gopi.RPC_FLAG_INET_V4|gopi.RPC_FLAG_INET_V6); err != nil {
 		return err
 	}
 
@@ -55,6 +59,27 @@ func Main(app gopi.App, args []string) error {
 
 	// Return success
 	return nil
+}
+
+func Services(app gopi.App) ([]gopi.RPCServiceRecord, error) {
+	addr := app.Flags().GetString("tradfri.addr", gopi.FLAG_NS_DEFAULT)
+	// Deal with the case where tradfri.addr is given
+	if addr != "" {
+		if host, port, err := HostPort(app); err != nil {
+			return nil, err
+		} else if addrs, err := LookupHost(host); err != nil {
+			return nil, err
+		} else {
+			return []gopi.RPCServiceRecord{
+				{Addrs: addrs, Port: uint16(port)},
+			}, nil
+		}
+	}
+	// Lookup the gateway
+	discovery := app.UnitInstance("discovery").(gopi.RPCServiceDiscovery)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	return discovery.Lookup(ctx, TRADFRI_MDNS_SERVICE)
 }
 
 func HostPort(app gopi.App) (string, uint, error) {

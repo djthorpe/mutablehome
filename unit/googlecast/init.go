@@ -15,10 +15,11 @@ import (
 func init() {
 	gopi.UnitRegister(gopi.UnitConfig{
 		Name:     Cast{}.Name(),
-		Requires: []string{"gopi/mdns/discovery"},
+		Requires: []string{"gopi/mdns/servicedb", "bus"},
 		New: func(app gopi.App) (gopi.Unit, error) {
 			return gopi.New(Cast{
-				Discovery: app.UnitInstance("gopi/mdns/discovery").(gopi.RPCServiceDiscovery),
+				Discovery: app.UnitInstance("gopi/mdns/servicedb").(gopi.RPCServiceDiscovery),
+				Bus:       app.Bus(),
 			}, app.Log().Clone(Cast{}.Name()))
 		},
 	})
