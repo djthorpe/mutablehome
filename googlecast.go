@@ -9,6 +9,7 @@ package mutablehome
 
 import (
 	// Frameworks
+
 	gopi "github.com/djthorpe/gopi/v2"
 )
 
@@ -24,9 +25,11 @@ type Cast interface {
 	// Return list of discovered Google Chromecast Devices
 	Devices() []CastDevice
 
-	// Connect to the control channel for a device, with timeout
-	//Connect(Device, gopi.RPCFlag, time.Duration) (Channel, error)
-	//Disconnect(Channel) error
+	// Connect to the control channel for a device
+	Connect(CastDevice, gopi.RPCFlag) error
+
+	// Disconnect from the device
+	Disconnect(CastDevice) error
 
 	// Implements gopi.Unit
 	gopi.Unit

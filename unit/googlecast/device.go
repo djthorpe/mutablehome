@@ -27,9 +27,10 @@ type devices struct {
 }
 
 type device struct {
-	gopi.RPCServiceRecord
 	txt_ map[string]string
 
+	gopi.RPCServiceRecord
+	connection
 	sync.Mutex
 }
 
@@ -130,9 +131,9 @@ func (this *device) Equals(other *device) bool {
 func (this *device) String() string {
 	return "<cast.Device" +
 		" id=" + strconv.Quote(this.Id()) +
-		" name=" + strconv.Quote(this.Id()) +
-		" model=" + strconv.Quote(this.Id()) +
-		" service=" + strconv.Quote(this.Id()) +
+		" name=" + strconv.Quote(this.Name()) +
+		" model=" + strconv.Quote(this.Model()) +
+		" service=" + strconv.Quote(this.Service()) +
 		" state=" + fmt.Sprint(this.State()) +
 		">"
 }

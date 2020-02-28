@@ -18,7 +18,7 @@ import (
 /////////////////////////////////////////////////////////////////////
 
 func main() {
-	if app, err := app.NewCommandLineTool(Main, nil, "googlecast"); err != nil {
+	if app, err := app.NewCommandLineTool(Main, Events, "googlecast"); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	} else {
 		app.Flags().FlagDuration("timeout", 500*time.Millisecond, "Discovery timeout")

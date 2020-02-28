@@ -121,6 +121,14 @@ func (this *cast) Devices() []iface.CastDevice {
 	return devices
 }
 
+func (this *cast) Connect(iface.CastDevice, gopi.RPCFlag) error {
+	return gopi.ErrNotImplemented
+}
+
+func (this *cast) Disconnect(iface.CastDevice) error {
+	return gopi.ErrNotImplemented
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // EVENT HANDLER
 
