@@ -32,7 +32,7 @@ type cast struct {
 	bus       gopi.Bus
 
 	devices
-	Lookup
+	lookup
 	base.Unit
 	sync.Mutex
 }
@@ -66,7 +66,7 @@ func (this *cast) Init(config Cast) error {
 	if config.Discovery == nil {
 		return gopi.ErrBadParameter.WithPrefix("discovery")
 	} else {
-		this.Lookup.Discovery = config.Discovery
+		this.lookup.Discovery = config.Discovery
 	}
 
 	// Check for bus
@@ -85,7 +85,7 @@ func (this *cast) Init(config Cast) error {
 	}
 
 	// Start discovery
-	if err := this.Lookup.Start(SERVICE_TYPE_GOOGLECAST); err != nil {
+	if err := this.lookup.Start(SERVICE_TYPE_GOOGLECAST); err != nil {
 		return err
 	}
 
@@ -98,7 +98,7 @@ func (this *cast) Close() error {
 	defer this.Mutex.Unlock()
 
 	// Stop discovery
-	this.Lookup.Stop()
+	this.lookup.Stop()
 
 	// Release device resources
 	this.devices.Close()
@@ -133,16 +133,16 @@ func (this *cast) EventHandler(_ context.Context, _ gopi.App, evt gopi.Event) {
 func (this *cast) RPCEventHandler(evt gopi.RPCEvent) {
 	switch evt.Type() {
 	case gopi.RPC_EVENT_SERVICE_ADDED:
-		if this.devices.Update(evt.Service()) {
-			this.Log.Warn("Added:", evt.Service().Name)
+		if device, updated := this.devices.Update(evt.Service()); updated == true {
+			this.bus.Emit(NewAddedEvent(this, device))
 		}
 	case gopi.RPC_EVENT_SERVICE_UPDATED:
-		if this.devices.Update(evt.Service()) {
-			this.Log.Warn("Updated:", evt.Service().Name)
+		if device, updated := this.devices.Update(evt.Service()); updated == true {
+			this.bus.Emit(NewUpdatedEvent(this, device))
 		}
 	case gopi.RPC_EVENT_SERVICE_EXPIRED, gopi.RPC_EVENT_SERVICE_REMOVED:
-		if this.devices.Remove(evt.Service()) {
-			this.Log.Warn("Removed:", evt.Service().Name)
+		if device, removed := this.devices.Remove(evt.Service()); removed == true {
+			this.bus.Emit(NewRemovedEvent(this, device))
 		}
 	default:
 		this.Log.Warn("Unhandled event", evt.Type(), "for", evt.Service().Name)

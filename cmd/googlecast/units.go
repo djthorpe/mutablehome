@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	// Frameworks
 	"github.com/djthorpe/gopi/v2/app"
@@ -20,6 +21,8 @@ func main() {
 	if app, err := app.NewCommandLineTool(Main, nil, "googlecast"); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	} else {
+		app.Flags().FlagDuration("timeout", 500*time.Millisecond, "Discovery timeout")
+		app.Flags().FlagBool("watch", false, "Watch for device changes")
 		os.Exit(app.Run())
 	}
 }
