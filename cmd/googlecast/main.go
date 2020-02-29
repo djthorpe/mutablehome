@@ -36,6 +36,20 @@ func PrintDevices(app gopi.App) error {
 		})
 	}
 	table.Render()
+
+	return nil
+}
+
+func SetVolume(app gopi.App) error {
+	cast := app.UnitInstance("googlecast").(mutablehome.Cast)
+	devices := cast.Devices()
+	for _, device := range devices {
+		if err := device.LaunchAppWithId("5C292C3E"); err != nil {
+			return err
+		}
+	}
+
+	// Return success
 	return nil
 }
 
@@ -44,6 +58,11 @@ func Main(app gopi.App, args []string) error {
 	time.Sleep(timeout)
 
 	if err := PrintDevices(app); err != nil {
+		return err
+	}
+
+	// volume
+	if err := SetVolume(app); err != nil {
 		return err
 	}
 

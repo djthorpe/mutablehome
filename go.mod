@@ -8,6 +8,7 @@ require (
 	github.com/djthorpe/mosquitto v1.0.2
 	github.com/djthorpe/rotel v1.0.5
 	github.com/go-ocf/go-coap v0.0.0-20200207111708-e8caffdb9036
+	github.com/golang/protobuf v1.3.2
 	github.com/influxdata/influxdb1-client v0.0.0-20191209144304-8bf82d3c094d
 	github.com/mattn/go-xmpp v0.0.0-20200128155807-a86b6abcb3ad
 	github.com/olekukonko/tablewriter v0.0.4

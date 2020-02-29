@@ -41,6 +41,19 @@ type CastDevice interface {
 	Model() string
 	Service() string
 	State() uint
+
+	// Volume
+	Volume() CastVolume
+	SetVolume(level float32) error
+	SetMute(mute bool) error
+
+	// Application
+	App() CastApp
+	LaunchAppWithId(string) error
+
+	// Play, pause and stop
+	SetPlay(bool) error  // Play or stop
+	SetPause(bool) error // Pause or play
 }
 
 type CastEvent interface {
@@ -48,6 +61,17 @@ type CastEvent interface {
 	Device() CastDevice
 
 	gopi.Event
+}
+
+type CastVolume interface {
+	Level() float32
+	Muted() bool
+}
+
+type CastApp interface {
+	ID() string
+	Name() string
+	Status() string
 }
 
 ////////////////////////////////////////////////////////////////////////////////
