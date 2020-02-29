@@ -19,7 +19,7 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 // TYPES
 
-type Lookup struct {
+type lookup struct {
 	Discovery gopi.RPCServiceDiscovery
 	cancel    context.CancelFunc
 
@@ -31,7 +31,7 @@ type Lookup struct {
 // Lookup
 
 // Start lookup in background
-func (this *Lookup) Start(service string) error {
+func (this *lookup) Start(service string) error {
 	this.Mutex.Lock()
 	defer this.Mutex.Unlock()
 
@@ -42,10 +42,8 @@ func (this *Lookup) Start(service string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		this.WaitGroup.Add(1)
-		if services, err := this.Discovery.Lookup(ctx, service); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
+		if _, err := this.Discovery.Lookup(ctx, service); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
 			fmt.Println(err)
-		} else {
-			fmt.Println(services)
 		}
 		this.WaitGroup.Done()
 	}()
@@ -56,7 +54,7 @@ func (this *Lookup) Start(service string) error {
 }
 
 // Stop lookup
-func (this *Lookup) Stop() {
+func (this *lookup) Stop() {
 	this.Mutex.Lock()
 	defer this.Mutex.Unlock()
 
@@ -64,5 +62,6 @@ func (this *Lookup) Stop() {
 	if this.cancel != nil {
 		this.cancel()
 		this.WaitGroup.Wait()
+		this.cancel = nil
 	}
 }
