@@ -23,6 +23,7 @@ func main() {
 	} else {
 		app.Flags().FlagDuration("timeout", 500*time.Millisecond, "Discovery timeout")
 		app.Flags().FlagBool("watch", false, "Watch for device changes")
+		app.Flags().FlagString("id", "", "Device name or UUID")
 		os.Exit(app.Run())
 	}
 }
