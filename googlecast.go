@@ -56,6 +56,9 @@ type CastDevice interface {
 	// Play, pause and stop
 	SetPlay(bool) error  // Play or stop
 	SetPause(bool) error // Pause or play
+
+	// Load Media by URL
+	LoadURL(url string, autoplay bool) error
 }
 
 type CastEvent interface {

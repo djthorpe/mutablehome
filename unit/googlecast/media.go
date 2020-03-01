@@ -20,20 +20,20 @@ type media struct {
 }
 
 type mediaItem struct {
-	ContentId   string        `json:"contentId"`
-	ContentType string        `json:"contentType"`
-	StreamType  string        `json:"streamType"`
-	Duration    float32       `json:"duration"`
-	Metadata    mediaMetadata `json:"metadata"`
+	ContentId   string         `json:"contentId"`
+	ContentType string         `json:"contentType,omitempty"`
+	StreamType  string         `json:"streamType,omitempty"`
+	Duration    float32        `json:"duration,omitempty"`
+	Metadata    *mediaMetadata `json:"metadata,omitempty"`
 }
 
 type mediaMetadata struct {
-	MetadataType int          `json:"metadataType`
-	Artist       string       `json:"artist"`
-	Title        string       `json:"title"`
-	Subtitle     string       `json:"subtitle"`
-	Images       []mediaImage `json:"images"`
-	ReleaseDate  string       `json:"releaseDate"`
+	MetadataType int          `json:"metadataType,omitempty"`
+	Artist       string       `json:"artist,omitempty"`
+	Title        string       `json:"title,omitempty"`
+	Subtitle     string       `json:"subtitle,omitempty"`
+	Images       []mediaImage `json:"images,omitempty"`
+	ReleaseDate  string       `json:"releaseDate,omitempty"`
 }
 
 type mediaImage struct {
@@ -83,7 +83,7 @@ func (this mediaItem) Equals(other mediaItem) bool {
 	return this.Metadata.Equals(other.Metadata)
 }
 
-func (this mediaMetadata) Equals(other mediaMetadata) bool {
+func (this *mediaMetadata) Equals(other *mediaMetadata) bool {
 	if this.MetadataType != other.MetadataType {
 		return false
 	}
@@ -136,7 +136,7 @@ func (this mediaItem) String() string {
 	if this.Duration != 0 {
 		parts += fmt.Sprintf(" duration=%v", this.Duration)
 	}
-	if this.Metadata.MetadataType != 0 {
+	if this.Metadata != nil && this.Metadata.MetadataType != 0 {
 		parts += fmt.Sprintf(" %v", this.Metadata)
 	}
 	return fmt.Sprintf("<item id=%v%v>", this.ContentId, parts)

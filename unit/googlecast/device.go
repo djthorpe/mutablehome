@@ -11,6 +11,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -262,6 +263,42 @@ func (this *device) SetPause(state bool) error {
 	if this.connection.IsConnected() == false {
 		return gopi.ErrOutOfOrder
 	} else if _, data, err := this.channel.PlayPause(state == false); err != nil {
+		return err
+	} else if err := this.send(data); err != nil {
+		return err
+	}
+
+	// Success
+	return nil
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// IMPLEMENTATION cast.Device LOAD & QUEUE
+
+func (this *device) LoadURL(url string, autoplay bool) error {
+	this.Mutex.Lock()
+	defer this.Mutex.Unlock()
+
+	// Connect to media
+	if this.connection.IsConnected() == false {
+		return gopi.ErrOutOfOrder
+	} else if this.app == nil || this.app.TransportId == "" {
+		return gopi.ErrOutOfOrder.WithPrefix("transportId")
+	} else if _, data, err := this.channel.ConnectMedia(this.app.TransportId); err != nil {
+		this.Log.Warn("ConnectMedia: %v", err)
+	} else if err := this.send(data); err != nil {
+		this.Log.Warn("ConnectMedia: %v", err)
+	}
+
+	// Get mimetype and load
+	client := http.Client{}
+	if response, err := client.Head(url); err != nil {
+		return err
+	} else if response.StatusCode != http.StatusOK {
+		return gopi.ErrUnexpectedResponse.WithPrefix(http.StatusText(response.StatusCode))
+	} else if mimetype := response.Header.Get("Content-Type"); mimetype == "" {
+		return gopi.ErrUnexpectedResponse.WithPrefix("Content type")
+	} else if _, data, err := this.channel.LoadUrl(this.app.TransportId, mediaUrl{url, mimetype}, autoplay); err != nil {
 		return err
 	} else if err := this.send(data); err != nil {
 		return err

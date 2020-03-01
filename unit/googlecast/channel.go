@@ -14,8 +14,7 @@ import (
 	"sync"
 
 	// Frameworks
-
-	"github.com/djthorpe/gopi/v2"
+	gopi "github.com/djthorpe/gopi/v2"
 	pb "github.com/djthorpe/mutablehome/grpc/castchannel"
 	proto "github.com/golang/protobuf/proto"
 )
@@ -27,6 +26,11 @@ type channel struct {
 	C         chan interface{}
 	messageId int
 	sync.Mutex
+}
+
+type mediaUrl struct {
+	url      string
+	mimetype string
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -130,6 +134,38 @@ func (this *channel) PlayPause(state bool) (int, []byte, error) {
 	}
 	id := this.nextMessageId()
 	data, err := this.encode(CAST_DEFAULT_SENDER, CAST_DEFAULT_RECEIVER, CAST_NS_RECV, payload.WithId(id))
+	return id, data, err
+}
+
+func (this *channel) LoadUrl(transportId string, media mediaUrl, autoplay bool) (int, []byte, error) {
+	payload := &LoadMediaRequest{}
+	payload.PayloadHeader = PayloadHeader{Type: "LOAD"}
+	payload.Autoplay = autoplay
+	payload.Media.ContentId = media.url
+	payload.Media.ContentType = media.mimetype
+	payload.Media.StreamType = "BUFFERED"
+	id := this.nextMessageId()
+	data, err := this.encode(CAST_DEFAULT_SENDER, transportId, CAST_NS_MEDIA, payload.WithId(id))
+	return id, data, err
+}
+
+func (this *channel) LoadPlaylist(transportId string, media []mediaUrl, repeat bool) (int, []byte, error) {
+	payload := &LoadQueueRequest{}
+	payload.PayloadHeader = PayloadHeader{Type: "QUEUE_LOAD"}
+	if repeat {
+		payload.RepeatMode = "REPEAT_ALL"
+	} else {
+		payload.RepeatMode = "REPEAT_OFF"
+	}
+	payload.Items = make([]LoadQueueItem, len(media))
+	for i, item := range media {
+		payload.Items[i].Autoplay = true
+		payload.Items[i].Media.ContentId = item.url
+		payload.Items[i].Media.ContentType = item.mimetype
+		payload.Items[i].Media.StreamType = "BUFFERED"
+	}
+	id := this.nextMessageId()
+	data, err := this.encode(CAST_DEFAULT_SENDER, transportId, CAST_NS_MEDIA, payload.WithId(id))
 	return id, data, err
 }
 
@@ -250,9 +286,10 @@ func (this *channel) rcvMessageMedia(message *pb.CastMessage) ([]byte, error) {
 		if err := json.Unmarshal([]byte(message.GetPayloadUtf8()), &mediaStatus); err != nil {
 			return nil, fmt.Errorf("MEDIA_STATUS: %w", err)
 		}
-
 		// Emit the media items
 		this.C <- mediaStatus.Status
+	case "LOAD_FAILED":
+		return nil, gopi.ErrUnexpectedResponse.WithPrefix(message.GetPayloadUtf8())
 	default:
 		return nil, fmt.Errorf("Ignoring message %v in namespace %v", strconv.Quote(header.Type), strconv.Quote(message.GetNamespace()))
 	}

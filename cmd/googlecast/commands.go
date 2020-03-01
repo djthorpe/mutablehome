@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
+	"time"
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi/v2"
@@ -27,10 +29,22 @@ var (
 		Command{"unmute", "unmute", regexp.MustCompile("^$"), Unmute},
 		Command{"pause", "pause", regexp.MustCompile("^$"), Pause},
 		Command{"stop", "stop", regexp.MustCompile("^$"), Stop},
+		Command{"load", "load <url>", regexp.MustCompile("^(http[s]?:.*)$"), Load},
 	}
 )
 
 /////////////////////////////////////////////////////////////////////
+
+func Load(_ gopi.App, devices []mutablehome.CastDevice, args []string) error {
+	time.Sleep(2 * time.Second)
+	fmt.Println("LOAD")
+	for _, device := range devices {
+		if err := device.LoadURL(args[0], true); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 func Play(_ gopi.App, devices []mutablehome.CastDevice, _ []string) error {
 	for _, device := range devices {
