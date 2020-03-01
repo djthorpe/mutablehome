@@ -39,6 +39,11 @@ type ReceiverStatusResponse struct {
 	} `json:"status"`
 }
 
+type MediaStatusResponse struct {
+	PayloadHeader
+	Status []media `json:"status"`
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // TYPES
 

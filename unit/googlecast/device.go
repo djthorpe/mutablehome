@@ -43,6 +43,7 @@ type device struct {
 	// chromecast state
 	volume *volume
 	app    *application
+	media  []media
 
 	connection
 	channel
@@ -53,7 +54,7 @@ type device struct {
 
 const (
 	READ_TIMEOUT    = 500 * time.Millisecond
-	STATUS_INTERVAL = 10 * time.Second
+	STATUS_INTERVAL = 5 * time.Second
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -111,7 +112,7 @@ func (this *device) Connect(flags gopi.RPCFlag, timeout time.Duration) error {
 		go this.rcv(this.stop)
 	}
 
-	if data, err := this.channel.Connect(); err != nil {
+	if _, data, err := this.channel.Connect(); err != nil {
 		return err
 	} else {
 		return this.send(data)
@@ -124,7 +125,7 @@ func (this *device) Disconnect() error {
 
 	if this.connection.IsConnected() {
 		// Send disconnect to channel
-		if data, err := this.channel.Disconnect(); err != nil {
+		if _, data, err := this.channel.Disconnect(); err != nil {
 			return err
 		} else if err := this.send(data); err != nil {
 			return err
@@ -144,6 +145,7 @@ func (this *device) Disconnect() error {
 	this.stop = nil
 	this.volume = nil
 	this.app = nil
+	this.media = nil
 
 	// Return success
 	return nil
@@ -166,33 +168,36 @@ func (this *device) Volume() iface.CastVolume {
 }
 
 func (this *device) SetVolume(level float32) error {
+	if level < 0.0 || level > 1.0 {
+		return gopi.ErrBadParameter.WithPrefix("level")
+	}
+
+	v := volume{level, false}
 	if level == 0 {
-		return this.SetVolumeEx(0.0, true)
-	} else {
-		return this.SetVolumeEx(level, false)
+		v = volume{0, true}
 	}
-}
 
-func (this *device) SetMute(mute bool) error {
-	if this.volume == nil {
-		return this.SetVolumeEx(0.5, mute)
-	} else {
-		return this.SetVolumeEx(this.volume.Level_, mute)
-	}
-}
-
-func (this *device) SetVolumeEx(level float32, muted bool) error {
-	v := volume{level, muted}
 	if this.connection.IsConnected() == false {
 		return gopi.ErrOutOfOrder
-	} else if level < 0.0 || level > 1.0 {
-		return gopi.ErrBadParameter.WithPrefix("level")
-	} else if data, err := this.channel.SetVolume(v); err != nil {
+	} else if _, data, err := this.channel.SetVolume(v); err != nil {
 		return err
 	} else if err := this.send(data); err != nil {
 		return err
 	} else {
 		this.setStateVolume(v)
+	}
+
+	// Success
+	return nil
+}
+
+func (this *device) SetMute(mute bool) error {
+	if this.connection.IsConnected() == false {
+		return gopi.ErrOutOfOrder
+	} else if _, data, err := this.channel.SetMuted(mute); err != nil {
+		return err
+	} else if err := this.send(data); err != nil {
+		return err
 	}
 
 	// Success
@@ -221,7 +226,7 @@ func (this *device) LaunchAppWithId(appId string) error {
 
 	if this.connection.IsConnected() == false {
 		return gopi.ErrOutOfOrder
-	} else if data, err := this.channel.LaunchAppWithId(appId); err != nil {
+	} else if _, data, err := this.channel.LaunchAppWithId(appId); err != nil {
 		return err
 	} else if err := this.send(data); err != nil {
 		return err
@@ -240,7 +245,7 @@ func (this *device) SetPlay(state bool) error {
 
 	if this.connection.IsConnected() == false {
 		return gopi.ErrOutOfOrder
-	} else if data, err := this.channel.PlayStop(state); err != nil {
+	} else if _, data, err := this.channel.PlayStop(state); err != nil {
 		return err
 	} else if err := this.send(data); err != nil {
 		return err
@@ -256,7 +261,7 @@ func (this *device) SetPause(state bool) error {
 
 	if this.connection.IsConnected() == false {
 		return gopi.ErrOutOfOrder
-	} else if data, err := this.channel.PlayPause(state == false); err != nil {
+	} else if _, data, err := this.channel.PlayPause(state == false); err != nil {
 		return err
 	} else if err := this.send(data); err != nil {
 		return err
@@ -284,16 +289,33 @@ FOR_LOOP:
 				this.setStateVolume(state.(volume))
 			case application:
 				this.setStateApplication(state.(application))
+			case []media:
+				this.setStateMedia(state.([]media))
 			default:
 				this.Log.Warn(this.Name()+":", "Unhandled state change: ", state)
 			}
 		case <-statusTimer.C:
 			// Update status if volume is nil
 			if this.volume == nil || this.app == nil {
-				if data, err := this.channel.GetStatus(); err != nil {
+				if _, data, err := this.channel.GetStatus(); err != nil {
 					this.Log.Warn("GetStatus: %v", err)
 				} else if err := this.send(data); err != nil {
 					this.Log.Warn("GetStatus: %v", err)
+				}
+			} else if this.app != nil && this.app.TransportId != "" {
+				// Connect to media
+				if this.media == nil {
+					if _, data, err := this.channel.ConnectMedia(this.app.TransportId); err != nil {
+						this.Log.Warn("ConnectMedia: %v", err)
+					} else if err := this.send(data); err != nil {
+						this.Log.Warn("ConnectMedia: %v", err)
+					}
+				}
+				// Get media status
+				if _, data, err := this.channel.GetMediaStatus(this.app.TransportId); err != nil {
+					this.Log.Warn("GetMediaStatus: %v", err)
+				} else if err := this.send(data); err != nil {
+					this.Log.Warn("GetMediaStatus: %v", err)
 				}
 			}
 
@@ -394,6 +416,9 @@ func (this *device) String() string {
 	if this.app != nil && this.app.AppId != "" {
 		str += " app=" + this.app.String()
 	}
+	if len(this.media) > 0 {
+		str += " media=" + fmt.Sprint(this.media)
+	}
 
 	return str + ">"
 }
@@ -413,9 +438,7 @@ func (this *device) setStateVolume(v volume) {
 	this.Mutex.Lock()
 	defer this.Mutex.Unlock()
 
-	if this.volume == nil {
-		this.volume = &v
-	} else if this.volume.Equals(v) == false {
+	if this.volume == nil || this.volume.Equals(v) == false {
 		this.volume = &v
 		this.Log.Info("Volume changed=", v) // TODO EMIT
 	}
@@ -425,11 +448,28 @@ func (this *device) setStateApplication(app application) {
 	this.Mutex.Lock()
 	defer this.Mutex.Unlock()
 
-	if this.app == nil {
-		this.app = &app
-	} else if this.app.Equals(app) == false {
+	if this.app == nil || this.app.Equals(app) == false {
 		this.app = &app
 		this.Log.Info("App changed=", app) // TODO EMIT
+	}
+
+	// If no application is playing then empty the media
+	if app.AppId == "" {
+		this.Log.Info("No media playing") // TODO EMIT
+		this.media = nil
+	}
+}
+
+func (this *device) setStateMedia(m []media) {
+	this.Mutex.Lock()
+	defer this.Mutex.Unlock()
+
+	if len(m) == 0 {
+		this.Log.Info("No media playing") // TODO EMIT
+		this.media = nil
+	} else {
+		this.Log.Info("Media updated:", m) // TODO EMIT
+		this.media = m
 	}
 }
 

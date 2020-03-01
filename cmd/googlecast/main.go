@@ -63,14 +63,6 @@ func PrintDevices(devices []mutablehome.CastDevice) {
 
 func ExecuteCommand(app gopi.App, devices []mutablehome.CastDevice, command string, args string) error {
 
-	// Connect to chromecasts
-	cast := app.UnitInstance("googlecast").(mutablehome.Cast)
-	for _, device := range devices {
-		if err := cast.Connect(device, gopi.RPC_FLAG_NONE); err != nil {
-			return err
-		}
-	}
-
 	// Run command for chromecasts
 	for _, c := range Commands {
 		if c.Name == strings.ToLower(command) {
@@ -104,10 +96,19 @@ func Main(app gopi.App, args []string) error {
 		return err
 	} else if devices = DevicesWithId(uuid, devices); len(devices) == 0 {
 		return gopi.ErrNotFound.WithPrefix("No Chromecasts found")
-	} else if len(args) == 0 {
-		PrintDevices(devices)
-	} else if err := ExecuteCommand(app, devices, args[0], strings.Join(args[1:], " ")); err != nil {
-		return err
+	} else {
+		// Connect to chromecasts
+		for _, device := range devices {
+			if err := cast.Connect(device, gopi.RPC_FLAG_NONE); err != nil {
+				return err
+			}
+		}
+		// Either print out the devices or execute a command
+		if len(args) == 0 {
+			PrintDevices(devices)
+		} else if err := ExecuteCommand(app, devices, args[0], strings.Join(args[1:], " ")); err != nil {
+			return err
+		}
 	}
 
 	// Watch for events
