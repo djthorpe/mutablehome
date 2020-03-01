@@ -27,20 +27,24 @@ import (
 // TYPES
 
 type Httpd struct {
-	Iface net.Interface
-	Port  uint
-	Flags gopi.RPCFlag
+	Iface    net.Interface
+	Port     uint
+	Flags    gopi.RPCFlag
+	Register gopi.RPCServiceRegister
 }
 
 type httpd struct {
-	log    gopi.Logger
-	server *http.Server
-	iface  net.Interface
-	host   string
-	port   uint
+	log      gopi.Logger
+	server   *http.Server
+	iface    net.Interface
+	host     string
+	port     uint
+	addrs    []net.IP
+	register gopi.RPCServiceRegister
 
 	base.Unit
 	sync.Mutex
+	sync.WaitGroup
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -84,16 +88,33 @@ func (this *httpd) Init(config Httpd) error {
 		}
 		if ip, err := addrForInterface(config.Iface, config.Flags); err != nil {
 			return err
-		} else if ip.To4() != nil {
-			this.host = ip.String()
-		} else if ip.To16() != nil {
-			this.host = fmt.Sprintf("[%v]", ip.String())
+		} else {
+			this.addrs = []net.IP{ip}
+			this.iface = config.Iface
 		}
-		this.iface = config.Iface
-	} else if host, err := os.Hostname(); err != nil {
+	} else if addrs, err := net.InterfaceAddrs(); err != nil {
+		return err
+	} else {
+		this.addrs = make([]net.IP, 0, len(addrs))
+		for _, addr := range addrs {
+			if ip, _, err := net.ParseCIDR(addr.String()); err == nil {
+				this.addrs = append(this.addrs, ip)
+			}
+		}
+	}
+
+	// Set hostname
+	if host, err := os.Hostname(); err != nil {
 		return err
 	} else {
 		this.host = host
+	}
+
+	// Set service register
+	if config.Register == nil {
+		return gopi.ErrBadParameter.WithPrefix("register")
+	} else {
+		this.register = config.Register
 	}
 
 	// Return success
@@ -112,26 +133,6 @@ func (this *httpd) Close() error {
 
 	// Return success
 	return this.Unit.Close()
-}
-
-func addrForInterface(iface net.Interface, flags gopi.RPCFlag) (net.IP, error) {
-	if flags&(gopi.RPC_FLAG_INET_V4|gopi.RPC_FLAG_INET_V6) == 0 {
-		flags = gopi.RPC_FLAG_INET_V4 | gopi.RPC_FLAG_INET_V6
-	}
-	addrs, err := iface.Addrs()
-	if err != nil {
-		return nil, err
-	}
-	for _, addr := range addrs {
-		if addr, _, err := net.ParseCIDR(addr.String()); err == nil {
-			if addr.To16() != nil && flags&gopi.RPC_FLAG_INET_V6 == gopi.RPC_FLAG_INET_V6 {
-				return addr, nil
-			} else if addr.To4() != nil && flags&gopi.RPC_FLAG_INET_V4 == gopi.RPC_FLAG_INET_V4 {
-				return addr, nil
-			}
-		}
-	}
-	return nil, gopi.ErrNotFound
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -160,6 +161,15 @@ func (this *httpd) HostPort() string {
 }
 
 func (this *httpd) BaseURL() string {
+	if this.iface.Index > 0 && len(this.addrs) > 0 {
+		// base url by interface address
+		if this.addrs[0].To4() != nil {
+			return fmt.Sprintf("http://%v:%v/", this.addrs[0].String(), this.port)
+		} else if this.addrs[0].To16() != nil {
+			return fmt.Sprintf("http://[%v]:%v/", this.addrs[0].String(), this.port)
+		}
+	}
+	// base url by hostname
 	return fmt.Sprintf("http://%v/", this.HostPort())
 }
 
@@ -176,7 +186,7 @@ func (this *httpd) ServeStatic(folder string) (*url.URL, error) {
 		folder = filepath.Clean(folder)
 	}
 
-	// Make URL
+	// Make URL and serve
 	if url, err := url.Parse(this.BaseURL()); err != nil {
 		return nil, err
 	} else if this.server != nil {
@@ -185,9 +195,31 @@ func (this *httpd) ServeStatic(folder string) (*url.URL, error) {
 		this.server = &http.Server{}
 		this.server.Handler = http.FileServer(http.Dir(folder))
 		this.server.Addr = this.HostPort()
-		go func() {
+
+		// Create a context for registration
+		ctx, cancel := context.WithCancel(context.Background())
+
+		// Serve files, cancel registration when done
+		go func(cancel context.CancelFunc) {
+			this.WaitGroup.Add(1)
+			defer this.WaitGroup.Done()
 			this.server.ListenAndServe()
+			cancel()
+		}(cancel)
+
+		// Register service
+		go func() {
+			this.WaitGroup.Add(1)
+			defer this.WaitGroup.Done()
+			this.register.Register(ctx, gopi.RPCServiceRecord{
+				Name:    this.host,
+				Service: SERVICE_TYPE_HTTP,
+				Port:    uint16(this.port),
+				Host:    this.host,
+				Addrs:   this.addrs,
+			})
 		}()
+
 		return url, nil
 	}
 }
@@ -197,7 +229,9 @@ func (this *httpd) Stop(ctx context.Context) error {
 	defer this.Mutex.Unlock()
 
 	if this.server != nil {
-		return this.server.Shutdown(ctx)
+		err := this.server.Shutdown(ctx)
+		this.WaitGroup.Wait()
+		return err
 	} else {
 		return nil
 	}
@@ -215,4 +249,24 @@ func unusedPort() (uint, error) {
 		defer sock.Close()
 		return uint(sock.Addr().(*net.TCPAddr).Port), nil
 	}
+}
+
+func addrForInterface(iface net.Interface, flags gopi.RPCFlag) (net.IP, error) {
+	if flags&(gopi.RPC_FLAG_INET_V4|gopi.RPC_FLAG_INET_V6) == 0 {
+		flags = gopi.RPC_FLAG_INET_V4 | gopi.RPC_FLAG_INET_V6
+	}
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return nil, err
+	}
+	for _, addr := range addrs {
+		if addr, _, err := net.ParseCIDR(addr.String()); err == nil {
+			if addr.To16() != nil && flags&gopi.RPC_FLAG_INET_V6 == gopi.RPC_FLAG_INET_V6 {
+				return addr, nil
+			} else if addr.To4() != nil && flags&gopi.RPC_FLAG_INET_V4 == gopi.RPC_FLAG_INET_V4 {
+				return addr, nil
+			}
+		}
+	}
+	return nil, gopi.ErrNotFound
 }

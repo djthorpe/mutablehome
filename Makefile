@@ -14,7 +14,7 @@ GOLDFLAGS += -X $(GOPI).GitHash=$(shell git rev-parse HEAD)
 GOLDFLAGS += -X $(GOPI).GoBuildTime=$(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 GOFLAGS = -ldflags "-s -w $(GOLDFLAGS)" 
 
-all: ecovacs tradfri googlecast
+all: ecovacs tradfri googlecast httpd
 
 ecovacs:
 	$(GOINSTALL) $(GOFLAGS) ./cmd/ecovacs
@@ -26,6 +26,8 @@ googlecast:
 	$(GOGEN) ./grpc
 	$(GOINSTALL) $(GOFLAGS) ./cmd/googlecast
 
+httpd:
+	$(GOINSTALL) $(GOFLAGS) ./cmd/httpd
 
 clean: 
 	$(GOCLEAN)

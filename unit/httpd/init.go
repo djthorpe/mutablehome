@@ -17,7 +17,7 @@ import (
 func init() {
 	gopi.UnitRegister(gopi.UnitConfig{
 		Name:     Httpd{}.Name(),
-		Requires: []string{"gopi/mdns/register"},
+		Requires: []string{"register"},
 		Config: func(app gopi.App) error {
 			app.Flags().FlagString("httpd.iface", "", "Bind interface")
 			app.Flags().FlagUint("httpd.port", 0, "Bind port")
@@ -28,8 +28,9 @@ func init() {
 				return nil, err
 			} else {
 				return gopi.New(Httpd{
-					Iface: iface,
-					Port:  app.Flags().GetUint("httpd.port", gopi.FLAG_NS_DEFAULT),
+					Iface:    iface,
+					Port:     app.Flags().GetUint("httpd.port", gopi.FLAG_NS_DEFAULT),
+					Register: app.UnitInstance("register").(gopi.RPCServiceRegister),
 				}, app.Log().Clone(Httpd{}.Name()))
 			}
 		},
