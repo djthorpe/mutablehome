@@ -4,7 +4,7 @@ go 1.13
 
 require (
 	github.com/djthorpe/gopi v1.0.86
-	github.com/djthorpe/gopi/v2 v2.0.20
+	github.com/djthorpe/gopi/v2 v2.0.21
 	github.com/djthorpe/mosquitto v1.0.2
 	github.com/djthorpe/rotel v1.0.5
 	github.com/go-ocf/go-coap v0.0.0-20200207111708-e8caffdb9036
