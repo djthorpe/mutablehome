@@ -9,37 +9,77 @@ package mutablehome
 
 import (
 	"time"
+
+	"github.com/djthorpe/gopi/v2"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
 // TYPES
 
-type PowerState uint
+type (
+	EventType uint
+	CapType   uint
+)
 
 ////////////////////////////////////////////////////////////////////////////////
 // NODE
 
 // Node is a collection of devices
 type Node interface {
-	Id() string        // Unique Id for the node
-	Name() string      // Textual description of the node
-	Devices() []Device // Node devices
+	gopi.PubSub
+
+	Id() string           // Unique Id for the node
+	Name() string         // Textual description of the node
+	Device(string) Device // Return device with Id
 }
 
 // Device is a device which can be controlled
 type Device interface {
-	Id() string   // Globally unique ID for the device
-	Name() string // Name of the device
+	Id() string     // Globally unique ID for the device
+	Name() string   // Name of the device
+	Cap() []CapType // Capabilities for the device
 }
 
-// CapPower represents a device which can be switched on, off or toggled
-type CapPower interface {
+// PowerCapability represents a device which can be switched on, off or toggled
+type PowerCapability interface {
 	Device
 
-	State() PowerState
-	On() error
-	Off() error
+	PowerState() CapType // Return ON, OFF or STANDBY
+	PowerOn() error
+	PowerOff() error
+	PowerStandby() error
+	PowerToggle() error
 }
+
+// Event is emitted when a device changes or node is online or offline
+// of type mutablehome.Event
+type Event interface {
+	gopi.Event
+
+	Type() EventType
+	Node() Node
+	Device() Device
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// CONSTANTS
+
+const (
+	CAP_NONE CapType = iota
+	CAP_POWER_ON
+	CAP_POWER_OFF
+	CAP_POWER_STANDBY
+	CAP_POWER_TOGGLE
+)
+
+const (
+	EVENT_NONE EventType = iota
+	EVENT_NODE_ONLINE
+	EVENT_NODE_OFFLINE
+	EVENT_DEVICE_ADDED
+	EVENT_DEVICE_REMOVED
+	EVENT_DEVICE_UPDATED
+)
 
 ////////////////////////////////////////////////////////////////////////////////
 // INFLUXDB

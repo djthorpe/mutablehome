@@ -21,18 +21,17 @@ import (
 // TYPES
 
 type (
-	Command   uint16
-	EventType uint16
-	Power     uint16
-	Volume    uint16
-	Source    uint16
-	Mute      uint16
-	Bypass    uint16
-	Tone      int16
-	Balance   int16
-	Dimmer    uint16
-	Speaker   uint16
-	Update    uint16
+	Command uint16
+	Power   uint16
+	Volume  uint16
+	Source  uint16
+	Mute    uint16
+	Bypass  uint16
+	Tone    int16
+	Balance int16
+	Dimmer  uint16
+	Speaker uint16
+	Update  uint16
 )
 
 ////////////////////////////////////////////////////////////////////////////////

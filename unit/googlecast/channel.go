@@ -15,7 +15,7 @@ import (
 
 	// Frameworks
 	gopi "github.com/djthorpe/gopi/v2"
-	pb "github.com/djthorpe/mutablehome/grpc/castchannel"
+	pb "github.com/djthorpe/mutablehome/protobuf/castchannel"
 	proto "github.com/golang/protobuf/proto"
 )
 

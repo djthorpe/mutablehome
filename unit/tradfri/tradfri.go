@@ -20,7 +20,7 @@ import (
 	// Frameworks
 	gopi "github.com/djthorpe/gopi/v2"
 	base "github.com/djthorpe/gopi/v2/base"
-	"github.com/djthorpe/mutablehome"
+	mutablehome "github.com/djthorpe/mutablehome"
 	"github.com/go-ocf/go-coap"
 	"github.com/go-ocf/go-coap/codes"
 	"github.com/pion/dtls/v2"
@@ -168,6 +168,9 @@ func (this *tradfri) Connect(service gopi.RPCServiceRecord, flags gopi.RPCFlag) 
 		}
 	}
 
+	// Emit connected message
+	this.bus.Emit(NewEvent(this, mutablehome.IKEA_EVENT_GATEWAY_CONNECTED, nil))
+
 	// Success
 	return nil
 }
@@ -175,6 +178,9 @@ func (this *tradfri) Connect(service gopi.RPCServiceRecord, flags gopi.RPCFlag) 
 func (this *tradfri) Disconnect() error {
 	this.Mutex.Lock()
 	defer this.Mutex.Unlock()
+
+	// Emit disconnected message
+	this.bus.Emit(NewEvent(this, mutablehome.IKEA_EVENT_GATEWAY_DISCONNECTED, nil))
 
 	// Close connection
 	if this.conn != nil {

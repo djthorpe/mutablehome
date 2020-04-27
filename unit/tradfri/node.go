@@ -10,6 +10,9 @@ package tradfri
 import (
 
 	// Frameworks
+	"context"
+	"fmt"
+
 	gopi "github.com/djthorpe/gopi/v2"
 	base "github.com/djthorpe/gopi/v2/base"
 	mutablehome "github.com/djthorpe/mutablehome"
@@ -19,12 +22,17 @@ import (
 // TYPES
 
 type Node struct {
-	Tradfri mutablehome.Ikea
+	Tradfri     mutablehome.Ikea
+	Bus         gopi.Bus
+	NodeService NodeService
 }
 
 type node struct {
 	base.Unit
+	base.PubSub
+
 	tradfri mutablehome.Ikea
+	bus     gopi.Bus
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -49,6 +57,19 @@ func (this *node) Init(config Node) error {
 	} else {
 		this.tradfri = config.Tradfri
 	}
+	if config.Bus == nil {
+		return gopi.ErrBadParameter.WithPrefix("bus")
+	} else {
+		this.bus = config.Bus
+	}
+	if config.NodeService == nil {
+		return gopi.ErrBadParameter.WithPrefix("nodeservice")
+	} else if err := config.NodeService.SetNode(this); err != nil {
+		return err
+	}
+
+	// Receive messages of type ikea.Event
+	this.bus.NewHandler(gopi.EventHandler{Name: "ikea.Event", Handler: this.EventHandlerFunc})
 
 	// Success
 	return nil
@@ -64,6 +85,15 @@ func (this *node) Close() error {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// STRINGIFY
+
+func (this *node) String() string {
+	str := "<" + this.Log.Name()
+	str += " tradfri=" + fmt.Sprint(this.tradfri)
+	return str + ">"
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // IMPLEMENTATION mutablehome.Node
 
 func (this *node) Id() string {
@@ -76,4 +106,23 @@ func (this *node) Name() string {
 
 func (this *node) Devices() []mutablehome.Device {
 	return nil
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// EVENT HANDLER
+
+func (this *node) EventHandlerFunc(_ context.Context, _ gopi.App, evt gopi.Event) {
+	evt_ := evt.(mutablehome.IkeaEvent)
+	switch evt_.Type() {
+	case mutablehome.IKEA_EVENT_GATEWAY_CONNECTED:
+		this.Log.Info("Gateway connected")
+	case mutablehome.IKEA_EVENT_GATEWAY_DISCONNECTED:
+		this.Log.Info("Gateway disconnected")
+	case mutablehome.IKEA_EVENT_DEVICE_ADDED:
+		this.Log.Info("Device added", evt_.Device())
+	case mutablehome.IKEA_EVENT_DEVICE_CHANGED:
+		this.Log.Info("Device changed", evt_.Device())
+	default:
+		this.Log.Warn("Ignoring:", evt_)
+	}
 }
