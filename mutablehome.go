@@ -8,6 +8,7 @@
 package mutablehome
 
 import (
+	"context"
 	"time"
 
 	"github.com/djthorpe/gopi/v2"
@@ -67,6 +68,14 @@ type Event interface {
 	Device() Device
 }
 
+// NodeStub represents a connection to a remote mutablehome node
+type NodeStub interface {
+	gopi.RPCClientStub
+
+	// Ping returns without error if the remote service is running
+	Ping(context.Context) error
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // CONSTANTS
 
@@ -110,25 +119,24 @@ func (v EventType) String() string {
 	}
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// CONSTANTS
-
-const (
-	CAP_NONE CapType = iota
-	CAP_POWER_ON
-	CAP_POWER_OFF
-	CAP_POWER_STANDBY
-	CAP_POWER_TOGGLE
-)
-
-const (
-	EVENT_NONE EventType = iota
-	EVENT_NODE_ONLINE
-	EVENT_NODE_OFFLINE
-	EVENT_DEVICE_ADDED
-	EVENT_DEVICE_REMOVED
-	EVENT_DEVICE_UPDATED
-)
+func (v CapType) String() string {
+	switch v {
+	case CAP_NONE:
+		return "CAP_NONE"
+	case CAP_POWER_ON:
+		return "CAP_POWER_ON"
+	case CAP_POWER_OFF:
+		return "CAP_POWER_OFF"
+	case CAP_POWER_STANDBY:
+		return "CAP_POWER_STANDBY"
+	case CAP_POWER_TOGGLE:
+		return "CAP_POWER_TOGGLE"
+	case CAP_LIGHT_BRIGHTNESS:
+		return "CAP_LIGHT_BRIGHTNESS"
+	default:
+		return "[?? Invalid CapType value]"
+	}
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // INFLUXDB

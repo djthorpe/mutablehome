@@ -9,6 +9,7 @@ package mutablehome
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	// Frameworks
@@ -27,7 +28,7 @@ type nodedevices struct {
 	online  bool
 	node    mutablehome.Node
 	stop    chan struct{}
-	devices map[string]bool
+	devices map[string]string
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -40,6 +41,9 @@ func (this *nodedevices) Init(log gopi.Logger) error {
 	} else {
 		this.Log = log
 	}
+
+	// Create devices
+	this.devices = make(map[string]string)
 
 	// Create stop channel
 	this.stop = make(chan struct{})
@@ -59,6 +63,7 @@ func (this *nodedevices) Close() error {
 	// Release resources
 	this.stop = nil
 	this.node = nil
+	this.devices = nil
 
 	// Success
 	return nil
@@ -142,11 +147,45 @@ func (this *nodedevices) ProcessEvent(evt mutablehome.Event) {
 // DEVICE METHODS
 
 func (this *nodedevices) AddDevice(device mutablehome.Device) error {
+	this.Mutex.Lock()
+	defer this.Mutex.Unlock()
+
 	if device == nil {
 		return gopi.ErrBadParameter.WithPrefix("Device")
 	}
 
-	this.Log.Debug("TODO:", device)
+	// Mark device in the device map
+	if id := strings.TrimSpace(device.Id()); id == "" {
+		return gopi.ErrBadParameter.WithPrefix("Id")
+	} else if _, exists := this.devices[id]; exists {
+		return gopi.ErrDuplicateItem.WithPrefix(id)
+	} else if name := strings.TrimSpace(device.Name()); name == "" {
+		return gopi.ErrBadParameter.WithPrefix("Name")
+	} else {
+		this.devices[id] = name
+	}
+
+	// Check capabilities for the device
+	for _, cap := range device.Cap() {
+		switch cap {
+		case mutablehome.CAP_POWER_ON, mutablehome.CAP_POWER_OFF, mutablehome.CAP_POWER_STANDBY, mutablehome.CAP_POWER_TOGGLE:
+			// Device should conform to mutablehome.PowerCapability
+			if _, ok := device.(mutablehome.PowerCapability); ok == false {
+				this.Log.Warn("Device", device.Id(), "does not implement capability", cap)
+			} else {
+				this.Log.Info("Device", device.Id(), "has capability", cap)
+			}
+		case mutablehome.CAP_LIGHT_BRIGHTNESS:
+			// Device should conform to mutablehome.LightCapability
+			if _, ok := device.(mutablehome.LightCapability); ok == false {
+				this.Log.Warn("Device", device.Id(), "does not implement capability", cap)
+			} else {
+				this.Log.Info("Device", device.Id(), "has capability", cap)
+			}
+		default:
+			this.Log.Warn("Device", device.Id(), ": Ignoring device capability:", cap)
+		}
+	}
 
 	// Successs
 	return nil

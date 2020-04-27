@@ -42,9 +42,7 @@ type nodeevent struct {
 }
 
 type nodedevice struct {
-	Type_   mutablehome.EventType
-	Source_ mutablehome.Node
-	Device_ mutablehome.Device
+	mutablehome.IkeaDevice
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -121,6 +119,70 @@ func (this *node) Device(string) mutablehome.Device {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// IMPLEMENTATION mutablehome.Device
+
+func (this *nodedevice) Id() string {
+	return fmt.Sprint(this.IkeaDevice.Id())
+}
+
+func (this *nodedevice) Name() string {
+	return this.IkeaDevice.Name()
+}
+
+func (this *nodedevice) Cap() []mutablehome.CapType {
+	caps := make([]mutablehome.CapType, 0)
+
+	switch this.IkeaDevice.Type() {
+	case mutablehome.IKEA_DEVICE_TYPE_LIGHT:
+		// If the device is a light, then power on & off are supported, and brightness
+		caps = append(caps, mutablehome.CAP_POWER_OFF, mutablehome.CAP_POWER_ON, mutablehome.CAP_LIGHT_BRIGHTNESS)
+	}
+
+	return caps
+}
+
+func (this *nodedevice) Power() mutablehome.CapType {
+	// If not a light, then return unknown
+	if this.IkeaDevice.Type() != mutablehome.IKEA_DEVICE_TYPE_LIGHT {
+		return mutablehome.CAP_NONE
+	}
+	// If no lights, then return unknown
+	if len(this.IkeaDevice.Lights()) == 0 {
+		return mutablehome.CAP_NONE
+	}
+	// Take first light value
+	if light := this.IkeaDevice.Lights()[0]; light.Power() == true {
+		return mutablehome.CAP_POWER_ON
+	} else {
+		return mutablehome.CAP_POWER_OFF
+	}
+}
+
+func (this *nodedevice) SetPower(state mutablehome.CapType) error {
+	// If not a light, then return error
+	if this.IkeaDevice.Type() != mutablehome.IKEA_DEVICE_TYPE_LIGHT {
+		return gopi.ErrNotImplemented.WithPrefix("Power")
+	}
+	// If no lights, then return error
+	if len(this.IkeaDevice.Lights()) == 0 {
+		return gopi.ErrNotImplemented.WithPrefix("Power")
+	}
+	// Set power value for all lights
+	for _, light := range this.IkeaDevice.Lights() {
+		switch state {
+		case mutablehome.CAP_POWER_ON:
+			fmt.Println("TODO: Switch on light", light)
+		case mutablehome.CAP_POWER_OFF:
+			fmt.Println("TODO: Switch off light", light)
+		default:
+			return gopi.ErrBadParameter.WithPrefix("Power")
+		}
+	}
+	// Return success
+	return nil
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // IMPLEMENTATION mutablehome.Evemt
 
 func (this *node) NewEvent(t mutablehome.EventType, d mutablehome.Device) mutablehome.Event {
@@ -160,15 +222,16 @@ func (this *nodeevent) Device() mutablehome.Device {
 
 func (this *node) EventHandlerFunc(_ context.Context, _ gopi.App, evt gopi.Event) {
 	evt_ := evt.(mutablehome.IkeaEvent)
+	device_ := &nodedevice{evt_.Device()}
 	switch evt_.Type() {
 	case mutablehome.IKEA_EVENT_GATEWAY_CONNECTED:
 		this.Emit(this.NewEvent(mutablehome.EVENT_NODE_ONLINE, nil))
 	case mutablehome.IKEA_EVENT_GATEWAY_DISCONNECTED:
 		this.Emit(this.NewEvent(mutablehome.EVENT_NODE_OFFLINE, nil))
 	case mutablehome.IKEA_EVENT_DEVICE_ADDED:
-		this.Emit(this.NewEvent(mutablehome.EVENT_DEVICE_ADDED, nil))
+		this.Emit(this.NewEvent(mutablehome.EVENT_DEVICE_ADDED, device_))
 	case mutablehome.IKEA_EVENT_DEVICE_CHANGED:
-		this.Emit(this.NewEvent(mutablehome.EVENT_DEVICE_CHANGED, nil))
+		this.Emit(this.NewEvent(mutablehome.EVENT_DEVICE_CHANGED, device_))
 	default:
 		this.Log.Warn("Ignoring:", evt_)
 	}
