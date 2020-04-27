@@ -8,8 +8,9 @@
 package mutablehome
 
 import (
-	// Frameworks
+	"context"
 
+	// Frameworks
 	gopi "github.com/djthorpe/gopi/v2"
 )
 
@@ -23,7 +24,7 @@ type CastEventType uint
 
 type Cast interface {
 	// Return list of discovered Google Chromecast Devices
-	Devices() []CastDevice
+	Devices(context.Context) ([]CastDevice, error)
 
 	// Connect to the control channel for a device
 	Connect(CastDevice, gopi.RPCFlag) error
@@ -54,6 +55,9 @@ type CastDevice interface {
 	// Play, pause and stop
 	SetPlay(bool) error  // Play or stop
 	SetPause(bool) error // Pause or play
+
+	// Load Media by URL
+	LoadURL(url string, autoplay bool) error
 }
 
 type CastEvent interface {

@@ -14,8 +14,7 @@ import (
 	"sync"
 
 	// Frameworks
-
-	"github.com/djthorpe/gopi/v2"
+	gopi "github.com/djthorpe/gopi/v2"
 	pb "github.com/djthorpe/mutablehome/grpc/castchannel"
 	proto "github.com/golang/protobuf/proto"
 )
@@ -27,6 +26,11 @@ type channel struct {
 	C         chan interface{}
 	messageId int
 	sync.Mutex
+}
+
+type mediaUrl struct {
+	url      string
+	mimetype string
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -44,32 +48,70 @@ const (
 ////////////////////////////////////////////////////////////////////////////////
 // CONNECT AND DISCONNECT MESSAGES
 
-func (this *channel) Connect() ([]byte, error) {
+func (this *channel) Connect() (int, []byte, error) {
 	payload := &PayloadHeader{Type: "CONNECT"}
-	return this.encode(CAST_DEFAULT_SENDER, CAST_DEFAULT_RECEIVER, CAST_NS_CONN, payload.WithId(this.nextMessageId()))
+	id := this.nextMessageId()
+	data, err := this.encode(CAST_DEFAULT_SENDER, CAST_DEFAULT_RECEIVER, CAST_NS_CONN, payload.WithId(id))
+	return id, data, err
 }
 
-func (this *channel) Disconnect() ([]byte, error) {
+func (this *channel) Disconnect() (int, []byte, error) {
 	payload := &PayloadHeader{Type: "CLOSE"}
-	return this.encode(CAST_DEFAULT_SENDER, CAST_DEFAULT_RECEIVER, CAST_NS_CONN, payload.WithId(this.nextMessageId()))
+	id := this.nextMessageId()
+	data, err := this.encode(CAST_DEFAULT_SENDER, CAST_DEFAULT_RECEIVER, CAST_NS_CONN, payload.WithId(id))
+	return id, data, err
 }
 
-func (this *channel) GetStatus() ([]byte, error) {
+func (this *channel) GetStatus() (int, []byte, error) {
 	payload := &PayloadHeader{Type: "GET_STATUS"}
-	return this.encode(CAST_DEFAULT_SENDER, CAST_DEFAULT_RECEIVER, CAST_NS_RECV, payload.WithId(this.nextMessageId()))
+	id := this.nextMessageId()
+	data, err := this.encode(CAST_DEFAULT_SENDER, CAST_DEFAULT_RECEIVER, CAST_NS_RECV, payload.WithId(id))
+	return id, data, err
 }
 
-func (this *channel) SetVolume(v volume) ([]byte, error) {
+func (this *channel) ConnectMedia(transportId string) (int, []byte, error) {
+	payload := &PayloadHeader{Type: "CONNECT"}
+	id := this.nextMessageId()
+	data, err := this.encode(CAST_DEFAULT_SENDER, transportId, CAST_NS_CONN, payload.WithId(id))
+	return id, data, err
+}
+
+func (this *channel) DisconnectMedia(transportId string) (int, []byte, error) {
+	payload := &PayloadHeader{Type: "CLOSE"}
+	id := this.nextMessageId()
+	data, err := this.encode(CAST_DEFAULT_SENDER, transportId, CAST_NS_CONN, payload.WithId(id))
+	return id, data, err
+}
+
+func (this *channel) GetMediaStatus(transportId string) (int, []byte, error) {
+	payload := &PayloadHeader{Type: "GET_STATUS"}
+	id := this.nextMessageId()
+	data, err := this.encode(CAST_DEFAULT_SENDER, transportId, CAST_NS_MEDIA, payload.WithId(id))
+	return id, data, err
+}
+
+func (this *channel) SetVolume(v volume) (int, []byte, error) {
 	payload := &SetVolumeRequest{PayloadHeader{Type: "SET_VOLUME"}, v}
-	return this.encode(CAST_DEFAULT_SENDER, CAST_DEFAULT_RECEIVER, CAST_NS_RECV, payload.WithId(this.nextMessageId()))
+	id := this.nextMessageId()
+	data, err := this.encode(CAST_DEFAULT_SENDER, CAST_DEFAULT_RECEIVER, CAST_NS_RECV, payload.WithId(id))
+	return id, data, err
 }
 
-func (this *channel) LaunchAppWithId(appId string) ([]byte, error) {
+func (this *channel) SetMuted(muted bool) (int, []byte, error) {
+	payload := &SetVolumeRequest{PayloadHeader{Type: "SET_VOLUME"}, volume{Muted_: muted}}
+	id := this.nextMessageId()
+	data, err := this.encode(CAST_DEFAULT_SENDER, CAST_DEFAULT_RECEIVER, CAST_NS_RECV, payload.WithId(id))
+	return id, data, err
+}
+
+func (this *channel) LaunchAppWithId(appId string) (int, []byte, error) {
 	payload := &LaunchAppRequest{PayloadHeader{Type: "LAUNCH"}, appId}
-	return this.encode(CAST_DEFAULT_SENDER, CAST_DEFAULT_RECEIVER, CAST_NS_RECV, payload.WithId(this.nextMessageId()))
+	id := this.nextMessageId()
+	data, err := this.encode(CAST_DEFAULT_SENDER, CAST_DEFAULT_RECEIVER, CAST_NS_RECV, payload.WithId(id))
+	return id, data, err
 }
 
-func (this *channel) PlayStop(state bool) ([]byte, error) {
+func (this *channel) PlayStop(state bool) (int, []byte, error) {
 	payload := &PayloadHeader{}
 	switch state {
 	case true:
@@ -77,10 +119,12 @@ func (this *channel) PlayStop(state bool) ([]byte, error) {
 	case false:
 		payload.Type = "STOP"
 	}
-	return this.encode(CAST_DEFAULT_SENDER, CAST_DEFAULT_RECEIVER, CAST_NS_RECV, payload.WithId(this.nextMessageId()))
+	id := this.nextMessageId()
+	data, err := this.encode(CAST_DEFAULT_SENDER, CAST_DEFAULT_RECEIVER, CAST_NS_RECV, payload.WithId(id))
+	return id, data, err
 }
 
-func (this *channel) PlayPause(state bool) ([]byte, error) {
+func (this *channel) PlayPause(state bool) (int, []byte, error) {
 	payload := &PayloadHeader{}
 	switch state {
 	case true:
@@ -88,7 +132,41 @@ func (this *channel) PlayPause(state bool) ([]byte, error) {
 	case false:
 		payload.Type = "PAUSE"
 	}
-	return this.encode(CAST_DEFAULT_SENDER, CAST_DEFAULT_RECEIVER, CAST_NS_RECV, payload.WithId(this.nextMessageId()))
+	id := this.nextMessageId()
+	data, err := this.encode(CAST_DEFAULT_SENDER, CAST_DEFAULT_RECEIVER, CAST_NS_RECV, payload.WithId(id))
+	return id, data, err
+}
+
+func (this *channel) LoadUrl(transportId string, media mediaUrl, autoplay bool) (int, []byte, error) {
+	payload := &LoadMediaRequest{}
+	payload.PayloadHeader = PayloadHeader{Type: "LOAD"}
+	payload.Autoplay = autoplay
+	payload.Media.ContentId = media.url
+	payload.Media.ContentType = media.mimetype
+	payload.Media.StreamType = "BUFFERED"
+	id := this.nextMessageId()
+	data, err := this.encode(CAST_DEFAULT_SENDER, transportId, CAST_NS_MEDIA, payload.WithId(id))
+	return id, data, err
+}
+
+func (this *channel) LoadPlaylist(transportId string, media []mediaUrl, repeat bool) (int, []byte, error) {
+	payload := &LoadQueueRequest{}
+	payload.PayloadHeader = PayloadHeader{Type: "QUEUE_LOAD"}
+	if repeat {
+		payload.RepeatMode = "REPEAT_ALL"
+	} else {
+		payload.RepeatMode = "REPEAT_OFF"
+	}
+	payload.Items = make([]LoadQueueItem, len(media))
+	for i, item := range media {
+		payload.Items[i].Autoplay = true
+		payload.Items[i].Media.ContentId = item.url
+		payload.Items[i].Media.ContentType = item.mimetype
+		payload.Items[i].Media.StreamType = "BUFFERED"
+	}
+	id := this.nextMessageId()
+	data, err := this.encode(CAST_DEFAULT_SENDER, transportId, CAST_NS_MEDIA, payload.WithId(id))
+	return id, data, err
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -189,6 +267,10 @@ func (this *channel) rcvMessageConnection(message *pb.CastMessage) ([]byte, erro
 	if err := json.Unmarshal([]byte(*message.PayloadUtf8), &header); err != nil {
 		return nil, err
 	}
+	switch header.Type {
+	default:
+		return nil, fmt.Errorf("Ignoring message %v in namespace %v", strconv.Quote(header.Type), strconv.Quote(message.GetNamespace()))
+	}
 	// Return success
 	return nil, nil
 }
@@ -197,6 +279,19 @@ func (this *channel) rcvMessageMedia(message *pb.CastMessage) ([]byte, error) {
 	var header PayloadHeader
 	if err := json.Unmarshal([]byte(*message.PayloadUtf8), &header); err != nil {
 		return nil, err
+	}
+	switch header.Type {
+	case "MEDIA_STATUS":
+		var mediaStatus MediaStatusResponse
+		if err := json.Unmarshal([]byte(message.GetPayloadUtf8()), &mediaStatus); err != nil {
+			return nil, fmt.Errorf("MEDIA_STATUS: %w", err)
+		}
+		// Emit the media items
+		this.C <- mediaStatus.Status
+	case "LOAD_FAILED":
+		return nil, gopi.ErrUnexpectedResponse.WithPrefix(message.GetPayloadUtf8())
+	default:
+		return nil, fmt.Errorf("Ignoring message %v in namespace %v", strconv.Quote(header.Type), strconv.Quote(message.GetNamespace()))
 	}
 	// Return success
 	return nil, nil

@@ -28,5 +28,12 @@ tradfri: protogen
 	@$(GO) build -o /opt/gaffer/bin/tradfri $(GOFLAGS) ./cmd/tradfri
 	@$(GO) build -o /opt/gaffer/sbin/tradfri-service $(GOFLAGS) ./cmd/tradfri-service
 
+googlecast:
+	$(GOGEN) ./grpc
+	$(GOINSTALL) $(GOFLAGS) ./cmd/googlecast
+
+httpd:
+	$(GOINSTALL) $(GOFLAGS) ./cmd/httpd
+
 clean: 
 	$(GOCLEAN)

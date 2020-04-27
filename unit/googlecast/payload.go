@@ -31,12 +31,36 @@ type LaunchAppRequest struct {
 	AppId string `json:"appId"`
 }
 
+type LoadMediaRequest struct {
+	PayloadHeader
+	Media       mediaItem `json:"media"`
+	CurrentTime int       `json:"currentTime,omitempty"`
+	Autoplay    bool      `json:"autoplay,omitempty"`
+}
+
+type LoadQueueRequest struct {
+	PayloadHeader
+	RepeatMode string          `json:"repeatMode"`
+	Items      []LoadQueueItem `json:"items"`
+}
+
+type LoadQueueItem struct {
+	Media            mediaItem `json:"media"`
+	Autoplay         bool      `json:"autoplay"`
+	PlaybackDuration uint      `json:"playbackDuration"`
+}
+
 type ReceiverStatusResponse struct {
 	PayloadHeader
 	Status struct {
 		Applications []application `json:"applications"`
 		Volume       volume        `json:"volume"`
 	} `json:"status"`
+}
+
+type MediaStatusResponse struct {
+	PayloadHeader
+	Status []media `json:"status"`
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -53,6 +77,11 @@ func (this *SetVolumeRequest) WithId(id int) Payload {
 }
 
 func (this *LaunchAppRequest) WithId(id int) Payload {
+	this.PayloadHeader.RequestId = id
+	return this
+}
+
+func (this *LoadMediaRequest) WithId(id int) Payload {
 	this.PayloadHeader.RequestId = id
 	return this
 }

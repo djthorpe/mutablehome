@@ -34,7 +34,6 @@ type cast struct {
 	timeout   time.Duration
 	devices   map[string]*device
 
-	lookup
 	base.Unit
 	sync.Mutex
 }
@@ -68,9 +67,9 @@ func (this *cast) Init(config Cast) error {
 	if config.Discovery == nil {
 		return gopi.ErrBadParameter.WithPrefix("discovery")
 	} else {
-		this.lookup.Discovery = config.Discovery
-		this.timeout = config.Timeout
 		this.devices = make(map[string]*device)
+		this.discovery = config.Discovery
+		this.timeout = config.Timeout
 	}
 
 	// Check for bus
@@ -85,11 +84,6 @@ func (this *cast) Init(config Cast) error {
 		return err
 	}
 
-	// Start discovery
-	if err := this.lookup.Start(SERVICE_TYPE_GOOGLECAST); err != nil {
-		return err
-	}
-
 	// Success
 	return nil
 }
@@ -97,9 +91,6 @@ func (this *cast) Init(config Cast) error {
 func (this *cast) Close() error {
 	this.Mutex.Lock()
 	defer this.Mutex.Unlock()
-
-	// Stop discovery
-	this.lookup.Stop()
 
 	// Disconnect devices
 	for _, device := range this.devices {
@@ -119,15 +110,25 @@ func (this *cast) Close() error {
 ////////////////////////////////////////////////////////////////////////////////
 // IMPLEMENTATION cast.Devices
 
-func (this *cast) Devices() []iface.CastDevice {
+func (this *cast) Devices(ctx context.Context) ([]iface.CastDevice, error) {
+
+	// Perform the lookup
+	if _, err := this.discovery.Lookup(ctx, SERVICE_TYPE_GOOGLECAST); err != nil && err != context.Canceled && err != context.DeadlineExceeded {
+		return nil, err
+	}
+
+	// Lock for reading devices
 	this.Mutex.Lock()
 	defer this.Mutex.Unlock()
 
+	// Enumerate the devices
 	devices := make([]iface.CastDevice, 0, len(this.devices))
 	for _, device := range this.devices {
 		devices = append(devices, device)
 	}
-	return devices
+
+	// Return success
+	return devices, nil
 }
 
 func (this *cast) Connect(d iface.CastDevice, flags gopi.RPCFlag) error {
@@ -201,7 +202,9 @@ func (this *cast) UpdateDevice(srv gopi.RPCServiceRecord) (*device, bool) {
 	this.Mutex.Lock()
 	defer this.Mutex.Unlock()
 
-	if key := srv.Name; key == "" {
+	if this.devices == nil {
+		return nil, false
+	} else if key := srv.Name; key == "" {
 		return nil, false
 	} else if d, exists := this.devices[key]; exists {
 		d.setService(srv)
@@ -219,7 +222,9 @@ func (this *cast) RemoveDevice(srv gopi.RPCServiceRecord) (*device, bool) {
 	this.Mutex.Lock()
 	defer this.Mutex.Unlock()
 
-	if key := srv.Name; key == "" {
+	if this.devices == nil {
+		return nil, false
+	} else if key := srv.Name; key == "" {
 		return nil, false
 	} else if device, exists := this.devices[key]; exists == false {
 		return nil, false
