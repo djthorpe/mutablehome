@@ -1,0 +1,20 @@
+/*
+	Mutablehome Automation
+	(c) Copyright David Thorpe 2020
+	All Rights Reserved
+	For Licensing and Usage information, please see LICENSE file
+*/
+
+syntax = "proto3";
+
+package mutablehome;
+option go_package = "github.com/djthorpe/mutablehome/protobuf/mutablehome";
+
+// Import dependencies
+import "google/protobuf/empty.proto";
+
+// The Node service definition
+service Node {
+  // Simple ping method to show server is "up"
+  rpc Ping (google.protobuf.Empty) returns (google.protobuf.Empty);
+}
