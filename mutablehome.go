@@ -21,7 +21,7 @@ type PowerState uint
 
 // Node is a collection of devices
 type Node interface {
-	Name() string
+	NodeName() string
 	Devices() []Device
 }
 

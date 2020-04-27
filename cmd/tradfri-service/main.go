@@ -22,6 +22,7 @@ import (
 	_ "github.com/djthorpe/gopi/v2/unit/logger"
 	_ "github.com/djthorpe/gopi/v2/unit/mdns"
 	_ "github.com/djthorpe/mutablehome/grpc/mutablehome"
+	_ "github.com/djthorpe/mutablehome/unit/tradfri"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -40,7 +41,7 @@ func Main(app gopi.App, args []string) error {
 // BOOTSTRAP
 
 func main() {
-	if app, err := app.NewServer(Main, "rpc/mutablehome/node", "register"); err != nil {
+	if app, err := app.NewServer(Main, "rpc/mutablehome/node", "mutablehome/node/tradfri", "register"); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	} else {
 		// Run and exit
