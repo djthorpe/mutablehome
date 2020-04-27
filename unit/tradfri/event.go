@@ -8,6 +8,8 @@
 package tradfri
 
 import (
+	"fmt"
+
 	"github.com/djthorpe/gopi/v2"
 	"github.com/djthorpe/mutablehome"
 )
@@ -56,4 +58,16 @@ func (this *event) Type() mutablehome.IkeaEventType {
 
 func (this *event) Device() mutablehome.IkeaDevice {
 	return this.Device_
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// STRINGIFY
+
+func (this *event) String() string {
+	str := "<" + this.Name()
+	str += " type=" + fmt.Sprint(this.Type_)
+	if this.Device_ != nil {
+		str += " device=" + fmt.Sprint(this.Device_)
+	}
+	return str + ">"
 }

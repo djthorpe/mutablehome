@@ -8,7 +8,6 @@
 package tradfri
 
 import (
-
 	// Frameworks
 	gopi "github.com/djthorpe/gopi/v2"
 	mutablehome "github.com/djthorpe/mutablehome"
@@ -41,22 +40,16 @@ func init() {
 		},
 	})
 
-	// Mutablehome node
+	// Mutablehome Node Implementation
 	gopi.UnitRegister(gopi.UnitConfig{
 		Name:     Node{}.Name(),
-		Requires: []string{Tradfri{}.Name(), "rpc/mutablehome/node"},
+		Requires: []string{Tradfri{}.Name(), "rpc/mutablehome/node", "bus"},
 		New: func(app gopi.App) (gopi.Unit, error) {
-			if node, err := gopi.New(Node{
-				Tradfri: app.UnitInstance(Tradfri{}.Name()).(mutablehome.Ikea),
-			}, app.Log().Clone(Node{}.Name())); err != nil {
-				return nil, err
-			} else if service := app.UnitInstance("rpc/mutablehome/node").(NodeService); service == nil {
-				return nil, gopi.ErrNotFound.WithPrefix("rpc/mutablehome/node")
-			} else if err := service.SetNode(node.(mutablehome.Node)); err != nil {
-				return nil, err
-			} else {
-				return node, nil
-			}
+			return gopi.New(Node{
+				Tradfri:     app.UnitInstance(Tradfri{}.Name()).(mutablehome.Ikea),
+				Bus:         app.Bus(),
+				NodeService: app.UnitInstance("rpc/mutablehome/node").(NodeService),
+			}, app.Log().Clone(Node{}.Name()))
 		},
 	})
 }

@@ -17,7 +17,6 @@ import (
 	grpc "github.com/djthorpe/gopi-rpc/v2/unit/grpc"
 	gopi "github.com/djthorpe/gopi/v2"
 	base "github.com/djthorpe/gopi/v2/base"
-	"github.com/djthorpe/mutablehome"
 
 	// Protocol buffers
 	pb "github.com/djthorpe/mutablehome/protobuf/mutablehome"
@@ -35,9 +34,9 @@ type NodeService struct {
 type nodeservice struct {
 	base.Unit
 	sync.Mutex
+	nodedevices
 
 	server gopi.RPCServer
-	node   mutablehome.Node
 	start  time.Time
 }
 
@@ -51,6 +50,8 @@ func (config NodeService) New(log gopi.Logger) (gopi.Unit, error) {
 	if err := this.Unit.Init(log); err != nil {
 		return nil, err
 	} else if err := this.Init(config); err != nil {
+		return nil, err
+	} else if err := this.nodedevices.Init(log); err != nil {
 		return nil, err
 	}
 
@@ -80,9 +81,12 @@ func (this *nodeservice) Close() error {
 	this.Mutex.Lock()
 	defer this.Mutex.Unlock()
 
+	if err := this.nodedevices.Close(); err != nil {
+		return err
+	}
+
 	// Release resources
 	this.server = nil
-	this.node = nil
 
 	return this.Unit.Close()
 }
@@ -91,24 +95,7 @@ func (this *nodeservice) Close() error {
 // STRINGIFY
 
 func (this *nodeservice) String() string {
-	return "<" + this.Log.Name() + " " + fmt.Sprint(this.server) + " node=" + fmt.Sprint(this.node) + ">"
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// IMPLEMENTATION mutablehome.RPCNodeService
-
-func (this *nodeservice) SetNode(node mutablehome.Node) error {
-	this.Mutex.Lock()
-	defer this.Mutex.Unlock()
-
-	if node == nil || this.node != nil {
-		return gopi.ErrBadParameter.WithPrefix("node")
-	} else {
-		this.node = node
-	}
-
-	// Return success
-	return nil
+	return "<" + this.Unit.Log.Name() + " " + fmt.Sprint(this.server) + " node=" + fmt.Sprint(this.node) + ">"
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -123,13 +110,13 @@ func (this *nodeservice) CancelRequests() error {
 // IMPLEMENTATION
 
 func (this *nodeservice) Ping(context.Context, *empty.Empty) (*empty.Empty, error) {
-	this.Log.Debug("<Ping>")
+	this.Unit.Log.Debug("<Ping>")
 
 	return &empty.Empty{}, nil
 }
 
 func (this *nodeservice) Metadata(context.Context, *empty.Empty) (*pb.MetadataResponse, error) {
-	this.Log.Debug("<Metadata>")
+	this.Unit.Log.Debug("<Metadata>")
 	this.Mutex.Lock()
 	defer this.Mutex.Unlock()
 
