@@ -111,6 +111,26 @@ func (v EventType) String() string {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// CONSTANTS
+
+const (
+	CAP_NONE CapType = iota
+	CAP_POWER_ON
+	CAP_POWER_OFF
+	CAP_POWER_STANDBY
+	CAP_POWER_TOGGLE
+)
+
+const (
+	EVENT_NONE EventType = iota
+	EVENT_NODE_ONLINE
+	EVENT_NODE_OFFLINE
+	EVENT_DEVICE_ADDED
+	EVENT_DEVICE_REMOVED
+	EVENT_DEVICE_UPDATED
+)
+
+////////////////////////////////////////////////////////////////////////////////
 // INFLUXDB
 
 type InfluxDB interface {
