@@ -44,6 +44,12 @@ func (config Node) New(log gopi.Logger) (gopi.Unit, error) {
 }
 
 func (this *node) Init(config Node) error {
+	if config.Tradfri == nil {
+		return gopi.ErrBadParameter.WithPrefix("tradfri")
+	} else {
+		this.tradfri = config.Tradfri
+	}
+
 	// Success
 	return nil
 }
@@ -55,4 +61,19 @@ func (this *node) Close() error {
 
 	// Success
 	return this.Unit.Close()
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// IMPLEMENTATION mutablehome.Node
+
+func (this *node) Id() string {
+	return "ID TODO"
+}
+
+func (this *node) Name() string {
+	return this.Unit.Log.Name()
+}
+
+func (this *node) Devices() []mutablehome.Device {
+	return nil
 }

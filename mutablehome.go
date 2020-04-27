@@ -21,8 +21,9 @@ type PowerState uint
 
 // Node is a collection of devices
 type Node interface {
-	NodeName() string
-	Devices() []Device
+	Id() string        // Unique Id for the node
+	Name() string      // Textual description of the node
+	Devices() []Device // Node devices
 }
 
 // Device is a device which can be controlled

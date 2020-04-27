@@ -8,10 +8,15 @@
 package tradfri
 
 import (
+
 	// Frameworks
 	gopi "github.com/djthorpe/gopi/v2"
-	"github.com/djthorpe/mutablehome"
+	mutablehome "github.com/djthorpe/mutablehome"
 )
+
+type NodeService interface {
+	SetNode(mutablehome.Node) error
+}
 
 func init() {
 	// Tradfri Gateway Connector
@@ -39,11 +44,19 @@ func init() {
 	// Mutablehome node
 	gopi.UnitRegister(gopi.UnitConfig{
 		Name:     Node{}.Name(),
-		Requires: []string{Tradfri{}.Name()},
+		Requires: []string{Tradfri{}.Name(), "rpc/mutablehome/node"},
 		New: func(app gopi.App) (gopi.Unit, error) {
-			return gopi.New(Node{
+			if node, err := gopi.New(Node{
 				Tradfri: app.UnitInstance(Tradfri{}.Name()).(mutablehome.Ikea),
-			}, app.Log().Clone(Node{}.Name()))
+			}, app.Log().Clone(Node{}.Name())); err != nil {
+				return nil, err
+			} else if service := app.UnitInstance("rpc/mutablehome/node").(NodeService); service == nil {
+				return nil, gopi.ErrNotFound.WithPrefix("rpc/mutablehome/node")
+			} else if err := service.SetNode(node.(mutablehome.Node)); err != nil {
+				return nil, err
+			} else {
+				return node, nil
+			}
 		},
 	})
 }
