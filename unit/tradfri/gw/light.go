@@ -5,13 +5,14 @@
 	For Licensing and Usage information, please see LICENSE file
 */
 
-package tradfri
+package gateway
 
 import (
 	"fmt"
 	"strconv"
 	"time"
 
+	// Modules
 	"github.com/djthorpe/mutablehome"
 )
 
@@ -90,30 +91,30 @@ func (this lightbulb) Equals(other lightbulb) bool {
 ////////////////////////////////////////////////////////////////////////////////
 // SET PROPERTIES
 
-func (this lightbulb) SetPower(state bool) mutablehome.IkeaCommand {
+func (this lightbulb) SetPower(state bool) mutablehome.TradfriCommand {
 	this.Power_ = boolToUint(state)
 	return NewLightState(this.deviceId_, lightbulb{Power_: boolToUint(state)})
 }
 
-func (this lightbulb) SetBrightness(value uint8, transition time.Duration) mutablehome.IkeaCommand {
+func (this lightbulb) SetBrightness(value uint8, transition time.Duration) mutablehome.TradfriCommand {
 	this.Brightness_ = value
 	this.TransitionTime_ = durationToTransition(transition)
 	return NewLightState(this.deviceId_, lightbulb{Power_: 1, Brightness_: value, TransitionTime_: this.TransitionTime_})
 }
 
-func (this lightbulb) SetColorHex(value string, transition time.Duration) mutablehome.IkeaCommand {
+func (this lightbulb) SetColorHex(value string, transition time.Duration) mutablehome.TradfriCommand {
 	this.ColorHex_ = value
 	this.TransitionTime_ = durationToTransition(transition)
 	return NewLightState(this.deviceId_, lightbulb{Power_: 1, ColorHex_: value, TransitionTime_: this.TransitionTime_})
 }
 
-func (this lightbulb) SetColorXY(x uint16, y uint16, transition time.Duration) mutablehome.IkeaCommand {
+func (this lightbulb) SetColorXY(x uint16, y uint16, transition time.Duration) mutablehome.TradfriCommand {
 	this.ColorX_, this.ColorY_ = x, y
 	this.TransitionTime_ = durationToTransition(transition)
 	return NewLightState(this.deviceId_, lightbulb{Power_: 1, ColorX_: x, ColorY_: y, TransitionTime_: this.TransitionTime_})
 }
 
-func (this lightbulb) SetTemperature(value uint16, transition time.Duration) mutablehome.IkeaCommand {
+func (this lightbulb) SetTemperature(value uint16, transition time.Duration) mutablehome.TradfriCommand {
 	this.Temperature_ = value
 	this.TransitionTime_ = durationToTransition(transition)
 	return NewLightState(this.deviceId_, lightbulb{Power_: 1, Temperature_: this.Temperature_, TransitionTime_: this.TransitionTime_})

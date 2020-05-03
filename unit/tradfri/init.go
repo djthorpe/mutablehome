@@ -11,45 +11,51 @@ import (
 	// Frameworks
 	gopi "github.com/djthorpe/gopi/v2"
 	mutablehome "github.com/djthorpe/mutablehome"
+	gateway "github.com/djthorpe/mutablehome/unit/tradfri/gw"
+	node "github.com/djthorpe/mutablehome/unit/tradfri/node"
 )
 
-type NodeService interface {
-	SetNode(mutablehome.Node) error
+////////////////////////////////////////////////////////////////////////////////
+
+type Node interface {
+	mutablehome.Node
+
+	// Connect to gateway
+	Connect(gopi.RPCServiceRecord, gopi.RPCFlag) error
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 func init() {
-	// Tradfri Gateway Connector
+	// Gateway Connector
 	gopi.UnitRegister(gopi.UnitConfig{
-		Name:     Tradfri{}.Name(),
-		Requires: []string{"bus"},
+		Name: gateway.Tradfri{}.Name(),
 		Config: func(app gopi.App) error {
 			app.Flags().FlagString("tradfri.id", "", "Unique identifier")
 			app.Flags().FlagString("tradfri.key", "", "Security code")
-			app.Flags().FlagString("tradfri.path", ".tradfri", "State storage path")
+			app.Flags().FlagString("tradfri.state", ".tradfri", "State storage path")
 			app.Flags().FlagDuration("tradfri.timeout", 0, "Connection timeout")
 			return nil
 		},
 		New: func(app gopi.App) (gopi.Unit, error) {
-			return gopi.New(Tradfri{
+			return gopi.New(gateway.Tradfri{
 				Id:      app.Flags().GetString("tradfri.id", gopi.FLAG_NS_DEFAULT),
 				Key:     app.Flags().GetString("tradfri.key", gopi.FLAG_NS_DEFAULT),
-				Path:    app.Flags().GetString("tradfri.path", gopi.FLAG_NS_DEFAULT),
+				Path:    app.Flags().GetString("tradfri.state", gopi.FLAG_NS_DEFAULT),
 				Timeout: app.Flags().GetDuration("tradfri.timeout", gopi.FLAG_NS_DEFAULT),
-				Bus:     app.Bus(),
-			}, app.Log().Clone(Tradfri{}.Name()))
+			}, app.Log().Clone(gateway.Tradfri{}.Name()))
 		},
 	})
 
-	// Mutablehome Node Implementation
+	// Node Connector
 	gopi.UnitRegister(gopi.UnitConfig{
-		Name:     Node{}.Name(),
-		Requires: []string{Tradfri{}.Name(), "rpc/mutablehome/node", "bus"},
+		Name:     node.Node{}.Name(),
+		Requires: []string{gateway.Tradfri{}.Name()},
 		New: func(app gopi.App) (gopi.Unit, error) {
-			return gopi.New(Node{
-				Tradfri:     app.UnitInstance(Tradfri{}.Name()).(mutablehome.Ikea),
-				Bus:         app.Bus(),
-				NodeService: app.UnitInstance("rpc/mutablehome/node").(NodeService),
-			}, app.Log().Clone(Node{}.Name()))
+			tradfri := app.UnitInstance(gateway.Tradfri{}.Name()).(mutablehome.TradfriGateway)
+			return gopi.New(node.Node{
+				Gateway: tradfri,
+			}, app.Log().Clone(node.Node{}.Name()))
 		},
 	})
 }

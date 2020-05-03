@@ -5,14 +5,14 @@
 	For Licensing and Usage information, please see LICENSE file
 */
 
-package tradfri
+package gateway
 
 import (
 	"fmt"
 	"strconv"
 	"time"
 
-	// Frameworks
+	// Modules
 	mutablehome "github.com/djthorpe/mutablehome"
 )
 
@@ -55,8 +55,8 @@ func (this *device) Id() uint {
 	return this.Id_
 }
 
-func (this *device) Type() mutablehome.IkeaDeviceType {
-	return mutablehome.IkeaDeviceType(this.Type_)
+func (this *device) Type() mutablehome.TradfriDeviceType {
+	return mutablehome.TradfriDeviceType(this.Type_)
 }
 
 func (this *device) Created() time.Time {
@@ -83,8 +83,8 @@ func (this *device) Version() string {
 	return this.Metadata_.Version
 }
 
-func (this *device) Lights() []mutablehome.IkeaLight {
-	lights := make([]mutablehome.IkeaLight, len(this.Lights_))
+func (this *device) Lights() []mutablehome.TradfriLight {
+	lights := make([]mutablehome.TradfriLight, len(this.Lights_))
 	for i, light := range this.Lights_ {
 		light.deviceId_ = this.Id()
 		lights[i] = light
@@ -151,7 +151,7 @@ func (this *device) Equals(other *device) bool {
 // STRINGIFY
 
 func (this *device) String() string {
-	str := "<ikea.Device" +
+	str := "<tradfri.Device" +
 		" id=" + fmt.Sprint(this.Id()) +
 		" type=" + fmt.Sprint(this.Type()) +
 		" name=" + strconv.Quote(this.Name()) +

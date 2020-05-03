@@ -19,7 +19,7 @@ import (
 
 type (
 	EventType uint
-	CapType   uint
+	TraitType uint
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -37,25 +37,25 @@ type Node interface {
 
 // Device is a device which can be observed or controlled
 type Device interface {
-	Id() string     // Globally unique ID for the device
-	Name() string   // Name of the device
-	Cap() []CapType // Capabilities for the device
+	Id() string          // Unique ID for the device
+	Name() string        // Name of the device
+	Traits() []TraitType // Capabilities for the device
 }
 
-// PowerCapability represents a device which can be switched on, off or toggled
-type PowerCapability interface {
+// PowerTrait represents a device which can be switched on, off or toggled
+type PowerTrait interface {
 	Device
 
-	Power() CapType         // Return ON, OFF or STANDBY or NONE if unknown
-	SetPower(CapType) error // Set ON, OFF, STANDBY or TOGGLE
+	Power() TraitType         // Return ON, OFF or STANDBY or NONE if unknown
+	SetPower(TraitType) error // Set ON, OFF, STANDBY or TOGGLE
 }
 
-// LightCapability represents a device which can have brightness or hue set
-type LightCapability interface {
+// LightTrait represents a device which can have brightness or hue set
+type LightTrait interface {
 	Device
 
-	Brightness() float32         // Return brightness between 0.0 and 1.0
-	SetBrightness(float32) error // Set brightness between 0.0 and 1.0
+	Brightness() float32                        // Return brightness between 0.0 and 1.0
+	SetBrightness(float32, time.Duration) error // Set brightness between 0.0 and 1.0 and a transition time
 }
 
 // Event is emitted when a device changes or node is online or offline
@@ -66,6 +66,7 @@ type Event interface {
 	Type() EventType
 	Node() Node
 	Device() Device
+	Traits() []TraitType
 }
 
 // NodeStub represents a connection to a remote mutablehome node
@@ -80,12 +81,15 @@ type NodeStub interface {
 // CONSTANTS
 
 const (
-	CAP_NONE CapType = iota
-	CAP_POWER_ON
-	CAP_POWER_OFF
-	CAP_POWER_STANDBY
-	CAP_POWER_TOGGLE
-	CAP_LIGHT_BRIGHTNESS
+	TRAIT_NONE TraitType = iota
+	TRAIT_POWER_ON
+	TRAIT_POWER_OFF
+	TRAIT_POWER_STANDBY
+	TRAIT_POWER_TOGGLE
+	TRAIT_LIGHT_BRIGHTNESS
+	TRAIT_LIGHT_TEMPERATURE
+	TRAIT_LIGHT_COLOR
+	TRAIT_LIGHT_TRANSITION
 )
 
 const (
@@ -94,7 +98,8 @@ const (
 	EVENT_NODE_OFFLINE
 	EVENT_DEVICE_ADDED
 	EVENT_DEVICE_REMOVED
-	EVENT_DEVICE_CHANGED
+	EVENT_DEVICE_METADATA_CHANGED
+	EVENT_DEVICE_TRAIT_CHANGED
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -112,34 +117,42 @@ func (v EventType) String() string {
 		return "EVENT_DEVICE_ADDED"
 	case EVENT_DEVICE_REMOVED:
 		return "EVENT_DEVICE_REMOVED"
-	case EVENT_DEVICE_CHANGED:
-		return "EVENT_DEVICE_CHANGED"
+	case EVENT_DEVICE_METADATA_CHANGED:
+		return "EVENT_DEVICE_METADATA_CHANGED"
+	case EVENT_DEVICE_TRAIT_CHANGED:
+		return "EVENT_DEVICE_TRAIT_CHANGED"
 	default:
 		return "[?? Invalid EventType value]"
 	}
 }
 
-func (v CapType) String() string {
+func (v TraitType) String() string {
 	switch v {
-	case CAP_NONE:
-		return "CAP_NONE"
-	case CAP_POWER_ON:
-		return "CAP_POWER_ON"
-	case CAP_POWER_OFF:
-		return "CAP_POWER_OFF"
-	case CAP_POWER_STANDBY:
-		return "CAP_POWER_STANDBY"
-	case CAP_POWER_TOGGLE:
-		return "CAP_POWER_TOGGLE"
-	case CAP_LIGHT_BRIGHTNESS:
-		return "CAP_LIGHT_BRIGHTNESS"
+	case TRAIT_NONE:
+		return "TRAIT_NONE"
+	case TRAIT_POWER_ON:
+		return "TRAIT_POWER_ON"
+	case TRAIT_POWER_OFF:
+		return "TRAIT_POWER_OFF"
+	case TRAIT_POWER_STANDBY:
+		return "TRAIT_POWER_STANDBY"
+	case TRAIT_POWER_TOGGLE:
+		return "TRAIT_POWER_TOGGLE"
+	case TRAIT_LIGHT_BRIGHTNESS:
+		return "TRAIT_LIGHT_BRIGHTNESS"
+	case TRAIT_LIGHT_TEMPERATURE:
+		return "TRAIT_LIGHT_TEMPERATURE"
+	case TRAIT_LIGHT_COLOR:
+		return "TRAIT_LIGHT_COLOR"
+	case TRAIT_LIGHT_TRANSITION:
+		return "TRAIT_LIGHT_TRANSITION"
 	default:
-		return "[?? Invalid CapType value]"
+		return "[?? Invalid TraitType value]"
 	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// INFLUXDB
+// INFLUXDB (old code)
 
 type InfluxDB interface {
 	// Create a new resultset

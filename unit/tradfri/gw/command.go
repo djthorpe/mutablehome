@@ -5,7 +5,7 @@
 	For Licensing and Usage information, please see LICENSE file
 */
 
-package tradfri
+package gateway
 
 import (
 	"bytes"
@@ -14,10 +14,10 @@ import (
 	"io"
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/djthorpe/gopi/v2"
-	"github.com/djthorpe/mutablehome"
+	// Modules
+	gopi "github.com/djthorpe/gopi/v2"
+	mutablehome "github.com/djthorpe/mutablehome"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -35,7 +35,7 @@ type command struct {
 ////////////////////////////////////////////////////////////////////////////////
 // NEW
 
-func NewLightState(device uint, state lightbulb) mutablehome.IkeaCommand {
+func NewLightState(device uint, state lightbulb) mutablehome.TradfriCommand {
 	return &command{
 		path: []string{PATH_DEVICES, fmt.Sprint(device)},
 		body: Lightstate{[]lightbulb{state}},
@@ -66,21 +66,6 @@ func (this *command) String() string {
 	if data, err := json.Marshal(this.body); err != nil {
 		return fmt.Sprint(err)
 	} else {
-		return "<IkeaCommand path=" + strconv.Quote(this.Path()) + " body=" + string(data) + ">"
+		return "<tradfri.Command path=" + strconv.Quote(this.Path()) + " body=" + string(data) + ">"
 	}
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// VALIDATE
-
-func boolToUint(value bool) uint {
-	if value {
-		return 1
-	} else {
-		return 0
-	}
-}
-
-func durationToTransition(duration time.Duration) float32 {
-	return float32(duration.Milliseconds()) / 100.0
 }

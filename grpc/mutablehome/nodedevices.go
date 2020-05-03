@@ -136,7 +136,7 @@ func (this *nodedevices) ProcessEvent(evt mutablehome.Event) {
 		}
 	case mutablehome.EVENT_DEVICE_REMOVED:
 		this.Log.Warn("Ignoring:", evt)
-	case mutablehome.EVENT_DEVICE_CHANGED:
+	case mutablehome.EVENT_DEVICE_METADATA_CHANGED, mutablehome.EVENT_DEVICE_TRAIT_CHANGED:
 		this.Log.Warn("Ignoring:", evt)
 	default:
 		this.Log.Warn("Ignoring:", evt)
@@ -166,24 +166,24 @@ func (this *nodedevices) AddDevice(device mutablehome.Device) error {
 	}
 
 	// Check capabilities for the device
-	for _, cap := range device.Cap() {
-		switch cap {
-		case mutablehome.CAP_POWER_ON, mutablehome.CAP_POWER_OFF, mutablehome.CAP_POWER_STANDBY, mutablehome.CAP_POWER_TOGGLE:
-			// Device should conform to mutablehome.PowerCapability
-			if _, ok := device.(mutablehome.PowerCapability); ok == false {
-				this.Log.Warn("Device", device.Id(), "does not implement capability", cap)
+	for _, trait := range device.Traits() {
+		switch trait {
+		case mutablehome.TRAIT_POWER_ON, mutablehome.TRAIT_POWER_OFF, mutablehome.TRAIT_POWER_STANDBY, mutablehome.TRAIT_POWER_TOGGLE:
+			// Device should conform to mutablehome.PowerTrait
+			if _, ok := device.(mutablehome.PowerTrait); ok == false {
+				this.Log.Warn("Device", device.Id(), "does not implement", trait)
 			} else {
-				this.Log.Info("Device", device.Id(), "has capability", cap)
+				this.Log.Info("Device", device.Id(), "has", trait)
 			}
-		case mutablehome.CAP_LIGHT_BRIGHTNESS:
-			// Device should conform to mutablehome.LightCapability
-			if _, ok := device.(mutablehome.LightCapability); ok == false {
-				this.Log.Warn("Device", device.Id(), "does not implement capability", cap)
+		case mutablehome.TRAIT_LIGHT_BRIGHTNESS, mutablehome.TRAIT_LIGHT_COLOR, mutablehome.TRAIT_LIGHT_TEMPERATURE:
+			// Device should conform to mutablehome.LightTrait
+			if _, ok := device.(mutablehome.LightTrait); ok == false {
+				this.Log.Warn("Device", device.Id(), "does not implement", trait)
 			} else {
-				this.Log.Info("Device", device.Id(), "has capability", cap)
+				this.Log.Info("Device", device.Id(), "has", trait)
 			}
 		default:
-			this.Log.Warn("Device", device.Id(), ": Ignoring device capability:", cap)
+			this.Log.Warn("Device", device.Id(), "ignoring trait", trait)
 		}
 	}
 

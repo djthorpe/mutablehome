@@ -5,7 +5,7 @@
 	For Licensing and Usage information, please see LICENSE file
 */
 
-package tradfri
+package gateway
 
 // https://github.com/ggravlingen/pytradfri/blob/master/pytradfri/const.py
 const (
@@ -105,4 +105,8 @@ const (
 	ATTR_TIME_START_TIME_MINUTE               = "9047"
 	ATTR_TRANSITION_TIME                      = "5712"
 	ATTR_USE_CURRENT_LIGHT_SETTINGS           = "9070"
+)
+
+const (
+	DEFAULT_PORT = 5684
 )
