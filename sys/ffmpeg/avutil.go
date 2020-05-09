@@ -13,6 +13,7 @@ import (
 //#include <libavutil/error.h>
 //#include <libavutil/dict.h>
 //#include <libavutil/mem.h>
+//#include <libavutil/frame.h>
 //#include <stdlib.h>
 import "C"
 
@@ -151,13 +152,13 @@ func (this *AVDictionaryEntry) String() string {
 
 // NewAVFrame allocates an AVFrame and set its fields to default values
 func NewAVFrame() *AVFrame {
-	return (*AVFormatContext)(C.av_frame_alloc())
+	return (*AVFrame)(C.av_frame_alloc())
 }
 
 // Free AVFormatContext
 func (this *AVFrame) Free() {
 	ctx := (*C.AVFrame)(unsafe.Pointer(this))
-	C.av_frame_free(ctx)
+	C.av_frame_free(&ctx)
 }
 
 func (this *AVFrame) String() string {
