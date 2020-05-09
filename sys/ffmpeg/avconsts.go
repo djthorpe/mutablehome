@@ -6,9 +6,10 @@ import "strings"
 // TYPES
 
 type (
-	AVCodecId   int
-	AVMediaType int
-	AVCodecCap  uint32
+	AVCodecId     int
+	AVMediaType   int
+	AVCodecCap    uint32
+	AVDisposition int
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -22,6 +23,29 @@ const (
 	AVMEDIA_TYPE_ATTACHMENT // Opaque data information usually sparse
 	AVMEDIA_TYPE_NB
 	AVMEDIA_TYPE_UNKNOWN AVMediaType = -1 // Usually treated as AVMEDIA_TYPE_DATA
+)
+
+const (
+	AV_DISPOSITION_DEFAULT          AVDisposition = 0x0001
+	AV_DISPOSITION_DUB              AVDisposition = 0x0002
+	AV_DISPOSITION_ORIGINAL         AVDisposition = 0x0004
+	AV_DISPOSITION_COMMENT          AVDisposition = 0x0008
+	AV_DISPOSITION_LYRICS           AVDisposition = 0x0010
+	AV_DISPOSITION_KARAOKE          AVDisposition = 0x0020
+	AV_DISPOSITION_FORCED           AVDisposition = 0x0040
+	AV_DISPOSITION_HEARING_IMPAIRED AVDisposition = 0x0080 // Stream for hearing impaired audiences
+	AV_DISPOSITION_VISUAL_IMPAIRED  AVDisposition = 0x0100 // Stream for visual impaired audiences
+	AV_DISPOSITION_CLEAN_EFFECTS    AVDisposition = 0x0200 // Stream without voice
+	AV_DISPOSITION_ATTACHED_PIC     AVDisposition = 0x0400
+	AV_DISPOSITION_TIMED_THUMBNAILS AVDisposition = 0x0800
+	AV_DISPOSITION_CAPTIONS         AVDisposition = 0x10000
+	AV_DISPOSITION_DESCRIPTIONS     AVDisposition = 0x20000
+	AV_DISPOSITION_METADATA         AVDisposition = 0x40000
+	AV_DISPOSITION_DEPENDENT        AVDisposition = 0x80000  // Dependent audio stream (mix_type=0 in mpegts)
+	AV_DISPOSITION_STILL_IMAGE      AVDisposition = 0x100000 // Still images in video stream (still_picture_flag=1 in mpegts)
+	AV_DISPOSITION_NONE             AVDisposition = 0
+	AV_DISPOSITION_MIN                            = AV_DISPOSITION_DEFAULT
+	AV_DISPOSITION_MAX                            = AV_DISPOSITION_STILL_IMAGE
 )
 
 const (
@@ -1539,5 +1563,61 @@ func (v AVCodecCap) FlagString() string {
 		return "AV_CODEC_CAP_HYBRID"
 	default:
 		return "[?? Invalid AVCodecCap value]"
+	}
+}
+
+func (v AVDisposition) String() string {
+	if v == AV_DISPOSITION_NONE {
+		return v.FlagString()
+	}
+	str := ""
+	for f := AV_DISPOSITION_MIN; f != AV_DISPOSITION_MAX; f <<= 1 {
+		if f&v == f {
+			str += "|" + f.FlagString()
+		}
+	}
+	return strings.TrimPrefix(str, "|")
+}
+
+func (v AVDisposition) FlagString() string {
+	switch v {
+	case AV_DISPOSITION_NONE:
+		return "AV_DISPOSITION_NONE"
+	case AV_DISPOSITION_DEFAULT:
+		return "AV_DISPOSITION_DEFAULT"
+	case AV_DISPOSITION_DUB:
+		return "AV_DISPOSITION_DUB"
+	case AV_DISPOSITION_ORIGINAL:
+		return "AV_DISPOSITION_ORIGINAL"
+	case AV_DISPOSITION_COMMENT:
+		return "AV_DISPOSITION_COMMENT"
+	case AV_DISPOSITION_LYRICS:
+		return "AV_DISPOSITION_LYRICS"
+	case AV_DISPOSITION_KARAOKE:
+		return "AV_DISPOSITION_KARAOKE"
+	case AV_DISPOSITION_FORCED:
+		return "AV_DISPOSITION_FORCED"
+	case AV_DISPOSITION_HEARING_IMPAIRED:
+		return "AV_DISPOSITION_HEARING_IMPAIRED"
+	case AV_DISPOSITION_VISUAL_IMPAIRED:
+		return "AV_DISPOSITION_VISUAL_IMPAIRED"
+	case AV_DISPOSITION_CLEAN_EFFECTS:
+		return "AV_DISPOSITION_CLEAN_EFFECTS"
+	case AV_DISPOSITION_ATTACHED_PIC:
+		return "AV_DISPOSITION_ATTACHED_PIC"
+	case AV_DISPOSITION_TIMED_THUMBNAILS:
+		return "AV_DISPOSITION_TIMED_THUMBNAILS"
+	case AV_DISPOSITION_CAPTIONS:
+		return "AV_DISPOSITION_CAPTIONS"
+	case AV_DISPOSITION_DESCRIPTIONS:
+		return "AV_DISPOSITION_DESCRIPTIONS"
+	case AV_DISPOSITION_METADATA:
+		return "AV_DISPOSITION_METADATA"
+	case AV_DISPOSITION_DEPENDENT:
+		return "AV_DISPOSITION_DEPENDENT"
+	case AV_DISPOSITION_STILL_IMAGE:
+		return "AV_DISPOSITION_STILL_IMAGE"
+	default:
+		return "[?? Invalid AVDisposition value]"
 	}
 }

@@ -2,6 +2,7 @@ package ffmpeg
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 	"unsafe"
 )
@@ -253,7 +254,29 @@ func (this *AVPacket) Init() {
 	C.av_init_packet((*C.AVPacket)(this))
 }
 
+func (this *AVPacket) Size() int {
+	ctx := (*C.AVPacket)(unsafe.Pointer(this))
+	return int(ctx.size)
+}
+
+// Returns bytes for a packet
+func (this *AVPacket) Bytes() []byte {
+	var bytes []byte
+
+	ctx := (*C.AVPacket)(unsafe.Pointer(this))
+
+	// Make a fake slice
+	sliceHeader := (*reflect.SliceHeader)((unsafe.Pointer(&bytes)))
+	sliceHeader.Cap = int(ctx.size)
+	sliceHeader.Len = int(ctx.size)
+	sliceHeader.Data = uintptr(unsafe.Pointer(ctx.data))
+
+	// Return slice
+	return bytes
+}
+
 func (this *AVPacket) String() string {
 	str := "<AVPacket"
+	str += " size=" + fmt.Sprint(this.Size())
 	return str + ">"
 }

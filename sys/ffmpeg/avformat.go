@@ -248,11 +248,28 @@ func (this *AVStream) CodecPar() *AVCodecParameters {
 	return (*AVCodecParameters)(ctx.codecpar)
 }
 
+func (this *AVStream) Disposition() AVDisposition {
+	ctx := (*C.AVStream)(unsafe.Pointer(this))
+	return AVDisposition(ctx.disposition)
+}
+
+func (this *AVStream) AttachedPicture() *AVPacket {
+	ctx := (*C.AVStream)(unsafe.Pointer(this))
+	if AVDisposition(ctx.disposition)&AV_DISPOSITION_ATTACHED_PIC == 0 {
+		return nil
+	} else {
+		return (*AVPacket)(&this.attached_pic)
+	}
+}
+
 func (this *AVStream) String() string {
 	str := "<AVCodecParameters"
 	str += " index=" + fmt.Sprint(this.Index())
 	str += " id=" + fmt.Sprint(this.Id())
 	str += " metadata=" + fmt.Sprint(this.Metadata())
 	str += " codecpar=" + fmt.Sprint(this.CodecPar())
+	if d := this.Disposition(); d != AV_DISPOSITION_NONE {
+		str += " disposition=" + fmt.Sprint(this.Disposition())
+	}
 	return str + ">"
 }

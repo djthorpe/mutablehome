@@ -32,6 +32,7 @@ var (
 		Cmd{"codecs", "List registered codecs", "", Codecs},
 		Cmd{"streams", "Display stream information", "<filename>", Streams},
 		Cmd{"metadata", "Display metadata information", "<filename>", Metadata},
+		Cmd{"artwork", "Extract artwork from file", "<filename>", Artwork},
 	}
 )
 

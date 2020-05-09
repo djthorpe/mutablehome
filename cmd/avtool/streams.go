@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	// Modules
 	"github.com/djthorpe/mutablehome/sys/ffmpeg"
@@ -15,6 +16,7 @@ func StreamToRow(stream *ffmpeg.AVStream) []string {
 	params := stream.CodecPar()
 	name := "-"
 	bitrate := "-"
+	extra := make([]string, 0)
 	if codec := ffmpeg.FindDecoderById(params.Id()); codec != nil {
 		name = codec.Name()
 	}
@@ -25,11 +27,18 @@ func StreamToRow(stream *ffmpeg.AVStream) []string {
 			bitrate = fmt.Sprint(br, " bps")
 		}
 	}
+	if w, h := params.Width(), params.Height(); w > 0 && h > 0 {
+		extra = append(extra, fmt.Sprint("frame={", w, "x", h, "}"))
+	}
+	if d := stream.Disposition(); d != ffmpeg.AV_DISPOSITION_NONE && d != ffmpeg.AV_DISPOSITION_DEFAULT {
+		extra = append(extra, d.String())
+	}
 	return []string{
 		fmt.Sprint(stream.Id()),
 		fmt.Sprint(params.Type()),
 		fmt.Sprint(name),
 		fmt.Sprint(bitrate),
+		strings.Join(extra, ","),
 	}
 }
 
@@ -47,7 +56,7 @@ func Streams(w io.Writer, args []string) error {
 			return err
 		}
 		table := tablewriter.NewWriter(w)
-		table.SetHeader([]string{"Id", "Type", "Codec", "Bitrate"})
+		table.SetHeader([]string{"Id", "Type", "Codec", "Bitrate", "Parameters"})
 		for _, stream := range ctx.Streams() {
 			table.Append(StreamToRow(stream))
 		}
