@@ -37,6 +37,9 @@ googlecast:
 	$(GOGEN) ./grpc
 	$(GOINSTALL) $(GOFLAGS) ./cmd/googlecast
 
+avtool:
+	$(GOINSTALL) ./cmd/avtool
+
 httpd:
 	$(GOINSTALL) $(GOFLAGS) ./cmd/httpd
 

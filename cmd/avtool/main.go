@@ -14,6 +14,7 @@ import (
 type Cmd struct {
 	Name        string
 	Description string
+	Syntax      string
 	Func        CmdFunc
 }
 
@@ -28,8 +29,9 @@ var (
 
 var (
 	commands = []Cmd{
-		Cmd{"codecs", "List registered codecs", Codecs},
-		Cmd{"streams", "Display stream information", Streams},
+		Cmd{"codecs", "List registered codecs", "", Codecs},
+		Cmd{"streams", "Display stream information", "<filename>", Streams},
+		Cmd{"metadata", "Display metadata information", "<filename>", Metadata},
 	}
 )
 
@@ -69,7 +71,7 @@ func Usage() {
 
 	fmt.Fprintf(w, "\nCommands:\n")
 	for _, cmd := range commands {
-		fmt.Fprintf(w, "  %v\n      %v\n", cmd.Name, cmd.Description)
+		fmt.Fprintf(w, "  %v %v\n      %v\n", cmd.Name, cmd.Syntax, cmd.Description)
 	}
 
 	fmt.Fprintf(w, "\nFlags:\n")
