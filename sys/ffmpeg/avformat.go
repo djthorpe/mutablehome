@@ -2,6 +2,7 @@ package ffmpeg
 
 import (
 	"fmt"
+	"net/url"
 	"reflect"
 	"strconv"
 	"sync"
@@ -25,21 +26,11 @@ type (
 	AVInputFormat   C.struct_AVInputFormat
 	AVOutputFormat  C.struct_AVOutputFormat
 	AVStream        C.struct_AVStream
-)
-
-type (
-	AVIOFlags int
+	AVIOContext     C.struct_AVIOContext
 )
 
 ////////////////////////////////////////////////////////////////////////////////
-// CONSTANTS
-
-const (
-	AVIO_FLAG_NONE       AVIOFlags = 0
-	AVIO_FLAG_READ       AVIOFlags = 1
-	AVIO_FLAG_WRITE      AVIOFlags = 2
-	AVIO_FLAG_READ_WRITE AVIOFlags = (AVIO_FLAG_READ | AVIO_FLAG_WRITE)
-)
+// GLOBALS
 
 var (
 	once_init, once_deinit sync.Once
@@ -62,11 +53,52 @@ func AVFormatDeinit() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// AVFORMATCONTEXT
+// AVIO
 
-// NewAVFormatContext creates a new format context
+func NewAVIOContext(url *url.URL, flags AVIOFlag) (*AVIOContext, error) {
+	url_ := C.CString(url.String())
+	defer C.free(unsafe.Pointer(url_))
+	ctx := (*C.AVIOContext)(unsafe.Pointer(nil))
+	if err := AVError(C.avio_open(
+		&ctx,
+		url_,
+		C.int(flags),
+	)); err != 0 {
+		return nil, err
+	} else {
+		return (*AVIOContext)(ctx), nil
+	}
+}
+
+func (this *AVIOContext) Free() {
+	ctx := (*C.AVIOContext)(unsafe.Pointer(this))
+	C.avio_context_free(&ctx)
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// AVFormatContext
+
+// NewAVFormatContext creates a new empty format context
 func NewAVFormatContext() *AVFormatContext {
 	return (*AVFormatContext)(C.avformat_alloc_context())
+}
+
+// NewAVFormatOutputContext creates a new format context with
+// context populated with output parameters
+func NewAVFormatOutputContext(filename string, output_format *AVOutputFormat) (*AVFormatContext, error) {
+	filename_ := C.CString(filename)
+	defer C.free(unsafe.Pointer(filename_))
+	ctx := (*C.AVFormatContext)(unsafe.Pointer(nil))
+	if err := AVError(C.avformat_alloc_output_context2(
+		&ctx,
+		(*C.AVOutputFormat)(output_format),
+		nil,
+		filename_,
+	)); err != 0 {
+		return nil, err
+	} else {
+		return (*AVFormatContext)(ctx), nil
+	}
 }
 
 // Free AVFormatContext
@@ -99,6 +131,18 @@ func (this *AVFormatContext) CloseInput() {
 	C.avformat_close_input(&ctx)
 }
 
+// Open Output
+func (this *AVFormatContext) OpenOutput(filename string, input_format *AVInputFormat) error {
+	// TODO
+	return nil
+}
+
+// Write header
+func (this *AVFormatContext) WriteHeader(dict *AVDictionary) error {
+	// TODO
+	return nil
+}
+
 // Return Metadata Dictionary
 func (this *AVFormatContext) Metadata() *AVDictionary {
 	return &AVDictionary{ctx: this.metadata}
@@ -121,6 +165,18 @@ func (this *AVFormatContext) FindStreamInfo() (*AVDictionary, error) {
 // Return Filename
 func (this *AVFormatContext) Filename() string {
 	return C.GoString(&this.filename[0])
+}
+
+// Return URL
+func (this *AVFormatContext) Url() *url.URL {
+	url_ := C.GoString(this.url)
+	if url_ == "" {
+		return nil
+	} else if url, err := url.Parse(url_); err != nil {
+		return nil
+	} else {
+		return url
+	}
 }
 
 // Return number of streams
@@ -147,12 +203,41 @@ func (this *AVFormatContext) Streams() []*AVStream {
 	return streams
 }
 
+// Return Input Format
+func (this *AVFormatContext) InputFormat() *AVInputFormat {
+	ctx := (*C.AVFormatContext)(unsafe.Pointer(this))
+	return (*AVInputFormat)(ctx.iformat)
+}
+
+// Return Output Format
+func (this *AVFormatContext) OutputFormat() *AVOutputFormat {
+	ctx := (*C.AVFormatContext)(unsafe.Pointer(this))
+	return (*AVOutputFormat)(ctx.oformat)
+}
+
 func (this *AVFormatContext) String() string {
 	str := "<AVFormatContext"
 	str += " filename=" + strconv.Quote(this.Filename())
+	if u := this.Url(); u != nil {
+		str += " url=" + strconv.Quote(u.String())
+	}
+	if ifmt := this.InputFormat(); ifmt != nil {
+		str += " iformat=" + fmt.Sprint(ifmt)
+	}
+	if ofmt := this.OutputFormat(); ofmt != nil {
+		str += " oformat=" + fmt.Sprint(ofmt)
+	}
 	str += " num_streams=" + fmt.Sprint(this.NumStreams())
 	str += " metadata=" + fmt.Sprint(this.Metadata())
 	return str + ">"
+}
+
+func (this *AVFormatContext) Dump(index int) {
+	if this.OutputFormat() != nil {
+		AVDumpFormat(this, index, this.Url().String(), true)
+	} else if this.InputFormat() != nil {
+		AVDumpFormat(this, index, this.Url().String(), false)
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -202,6 +287,10 @@ func (this *AVInputFormat) MimeType() string {
 	return C.GoString(this.mime_type)
 }
 
+func (this *AVInputFormat) Flags() AVFormatFlag {
+	return AVFormatFlag(this.flags)
+}
+
 func (this *AVOutputFormat) Name() string {
 	return C.GoString(this.name)
 }
@@ -218,16 +307,39 @@ func (this *AVOutputFormat) MimeType() string {
 	return C.GoString(this.mime_type)
 }
 
+func (this *AVOutputFormat) Flags() AVFormatFlag {
+	return AVFormatFlag(this.flags)
+}
+
 func (this *AVInputFormat) String() string {
-	return fmt.Sprintf("<AVInputFormat>{ name=%v description=%v ext=%v mime_type=%v }", strconv.Quote(this.Name()), strconv.Quote(this.Description()), strconv.Quote(this.Ext()), strconv.Quote(this.MimeType()))
+	str := "<AVInputFormat"
+	str += " name=" + strconv.Quote(this.Name())
+	str += " description=" + strconv.Quote(this.Description())
+	str += " ext=" + strconv.Quote(this.Ext())
+	str += " mime_type=" + strconv.Quote(this.MimeType())
+	str += " flags=" + fmt.Sprint(this.Flags())
+	return str + ">"
 }
 
 func (this *AVOutputFormat) String() string {
-	return fmt.Sprintf("<AVOutputFormat>{ name=%v description=%v ext=%v mime_type=%v }", strconv.Quote(this.Name()), strconv.Quote(this.Description()), strconv.Quote(this.Ext()), strconv.Quote(this.MimeType()))
+	str := "<AVOutputFormat"
+	str += " name=" + strconv.Quote(this.Name())
+	str += " description=" + strconv.Quote(this.Description())
+	str += " ext=" + strconv.Quote(this.Ext())
+	str += " mime_type=" + strconv.Quote(this.MimeType())
+	str += " flags=" + fmt.Sprint(this.Flags())
+	return str + ">"
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // AVStream
+
+func NewStream(ctx *AVFormatContext, codec *AVCodec) *AVStream {
+	return (*AVStream)(C.avformat_new_stream(
+		(*C.AVFormatContext)(ctx),
+		(*C.AVCodec)(codec),
+	))
+}
 
 func (this *AVStream) Index() int {
 	ctx := (*C.AVStream)(unsafe.Pointer(this))
@@ -272,4 +384,17 @@ func (this *AVStream) String() string {
 		str += " disposition=" + fmt.Sprint(this.Disposition())
 	}
 	return str + ">"
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// UTILITY METHODS
+
+func AVDumpFormat(ctx *AVFormatContext, index int, filename string, is_output bool) {
+	filename_ := C.CString(filename)
+	defer C.free(unsafe.Pointer(filename_))
+	is_output_ := 0
+	if is_output {
+		is_output_ = 1
+	}
+	C.av_dump_format((*C.AVFormatContext)(ctx), C.int(index), filename_, C.int(is_output_))
 }

@@ -10,6 +10,9 @@ type (
 	AVMediaType   int
 	AVCodecCap    uint32
 	AVDisposition int
+	AVFormatFlag  int
+	AVIOFlag      int
+	AVLogLevel    int
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -23,6 +26,25 @@ const (
 	AVMEDIA_TYPE_ATTACHMENT // Opaque data information usually sparse
 	AVMEDIA_TYPE_NB
 	AVMEDIA_TYPE_UNKNOWN AVMediaType = -1 // Usually treated as AVMEDIA_TYPE_DATA
+)
+
+const (
+	AVIO_FLAG_NONE       AVIOFlag = 0
+	AVIO_FLAG_READ       AVIOFlag = 1
+	AVIO_FLAG_WRITE      AVIOFlag = 2
+	AVIO_FLAG_READ_WRITE AVIOFlag = (AVIO_FLAG_READ | AVIO_FLAG_WRITE)
+)
+
+const (
+	AV_LOG_QUIET   AVLogLevel = -8
+	AV_LOG_PANIC   AVLogLevel = 0
+	AV_LOG_FATAL   AVLogLevel = 8
+	AV_LOG_ERROR   AVLogLevel = 16
+	AV_LOG_WARNING AVLogLevel = 24
+	AV_LOG_INFO    AVLogLevel = 32
+	AV_LOG_VERBOSE AVLogLevel = 40
+	AV_LOG_DEBUG   AVLogLevel = 48
+	AV_LOG_TRACE   AVLogLevel = 56
 )
 
 const (
@@ -70,6 +92,29 @@ const (
 	AV_CODEC_CAP_NONE                AVCodecCap = 0
 	AV_CODEC_CAP_MIN                 AVCodecCap = AV_CODEC_CAP_DRAW_HORIZ_BAND
 	AV_CODEC_CAP_MAX                 AVCodecCap = AV_CODEC_CAP_LOSSLESS
+)
+
+const (
+	AVFMT_NOFILE        AVFormatFlag = 0x0001
+	AVFMT_NEEDNUMBER    AVFormatFlag = 0x0002    // Needs '%d' in filename
+	AVFMT_SHOW_IDS      AVFormatFlag = 0x0008    // Show format stream IDs numbers
+	AVFMT_GLOBALHEADER  AVFormatFlag = 0x0040    // Format wants global header
+	AVFMT_NOTIMESTAMPS  AVFormatFlag = 0x0080    // Format does not need / have any timestamps
+	AVFMT_GENERIC_INDEX AVFormatFlag = 0x0100    // Use generic index building code
+	AVFMT_TS_DISCONT    AVFormatFlag = 0x0200    // Format allows timestamp discontinuities. Note, muxers always require valid (monotone) timestamps
+	AVFMT_VARIABLE_FPS  AVFormatFlag = 0x0400    // Format allows variable fps
+	AVFMT_NODIMENSIONS  AVFormatFlag = 0x0800    // Format does not need width/height
+	AVFMT_NOSTREAMS     AVFormatFlag = 0x1000    // Format does not require any streams
+	AVFMT_NOBINSEARCH   AVFormatFlag = 0x2000    // Format does not allow to fall back on binary search via read_timestamp
+	AVFMT_NOGENSEARCH   AVFormatFlag = 0x4000    // Format does not allow to fall back on generic search
+	AVFMT_NO_BYTE_SEEK  AVFormatFlag = 0x8000    // Format does not allow seeking by bytes
+	AVFMT_ALLOW_FLUSH   AVFormatFlag = 0x10000   // Format allows flushing. If not set, the muxer will not receive a NULL packet in the write_packet function
+	AVFMT_TS_NONSTRICT  AVFormatFlag = 0x20000   // Format does not require strictly increasing timestamps, but they must still be monotonic
+	AVFMT_TS_NEGATIVE   AVFormatFlag = 0x40000   // Format allows muxing negative timestamps. If not set the timestamp will be shifted in av_write_frame and av_interleaved_write_frame so they start from 0. The user or muxer can override this through AVFormatContext.avoid_negative_ts
+	AVFMT_SEEK_TO_PTS   AVFormatFlag = 0x4000000 // Seeking is based on PTS
+	AVFMT_NONE          AVFormatFlag = 0
+	AVFMT_MIN                        = AVFMT_NOFILE
+	AVFMT_MAX                        = AVFMT_SEEK_TO_PTS
 )
 
 const (
@@ -1619,5 +1664,86 @@ func (v AVDisposition) FlagString() string {
 		return "AV_DISPOSITION_STILL_IMAGE"
 	default:
 		return "[?? Invalid AVDisposition value]"
+	}
+}
+
+func (v AVFormatFlag) String() string {
+	if v == AVFMT_NONE {
+		return v.FlagString()
+	}
+	str := ""
+	for f := AVFMT_MIN; f != AVFMT_MAX; f <<= 1 {
+		if f&v == f {
+			str += "|" + f.FlagString()
+		}
+	}
+	return strings.TrimPrefix(str, "|")
+}
+
+func (v AVFormatFlag) FlagString() string {
+	switch v {
+	case AVFMT_NONE:
+		return "AVFMT_NONE"
+	case AVFMT_NOFILE:
+		return "AVFMT_NOFILE"
+	case AVFMT_NEEDNUMBER:
+		return "AVFMT_NEEDNUMBER"
+	case AVFMT_SHOW_IDS:
+		return "AVFMT_SHOW_IDS"
+	case AVFMT_GLOBALHEADER:
+		return "AVFMT_GLOBALHEADER"
+	case AVFMT_NOTIMESTAMPS:
+		return "AVFMT_NOTIMESTAMPS"
+	case AVFMT_GENERIC_INDEX:
+		return "AVFMT_GENERIC_INDEX"
+	case AVFMT_TS_DISCONT:
+		return "AVFMT_TS_DISCONT"
+	case AVFMT_VARIABLE_FPS:
+		return "AVFMT_VARIABLE_FPS"
+	case AVFMT_NODIMENSIONS:
+		return "AVFMT_NODIMENSIONS"
+	case AVFMT_NOSTREAMS:
+		return "AVFMT_NOSTREAMS"
+	case AVFMT_NOBINSEARCH:
+		return "AVFMT_NOBINSEARCH"
+	case AVFMT_NOGENSEARCH:
+		return "AVFMT_NOGENSEARCH"
+	case AVFMT_NO_BYTE_SEEK:
+		return "AVFMT_NO_BYTE_SEEK"
+	case AVFMT_ALLOW_FLUSH:
+		return "AVFMT_ALLOW_FLUSH"
+	case AVFMT_TS_NONSTRICT:
+		return "AVFMT_TS_NONSTRICT"
+	case AVFMT_TS_NEGATIVE:
+		return "AVFMT_TS_NEGATIVE"
+	case AVFMT_SEEK_TO_PTS:
+		return "AVFMT_SEEK_TO_PTS"
+	default:
+		return "[?? Invalid AVFormatFlag value]"
+	}
+}
+
+func (v AVLogLevel) String() string {
+	switch v {
+	case AV_LOG_QUIET:
+		return "AV_LOG_QUIET"
+	case AV_LOG_PANIC:
+		return "AV_LOG_PANIC"
+	case AV_LOG_FATAL:
+		return "AV_LOG_FATAL"
+	case AV_LOG_ERROR:
+		return "AV_LOG_ERROR"
+	case AV_LOG_WARNING:
+		return "AV_LOG_WARNING"
+	case AV_LOG_INFO:
+		return "AV_LOG_INFO"
+	case AV_LOG_VERBOSE:
+		return "AV_LOG_VERBOSE"
+	case AV_LOG_DEBUG:
+		return "AV_LOG_DEBUG"
+	case AV_LOG_TRACE:
+		return "AV_LOG_TRACE"
+	default:
+		return "[?? Invalid AVLogLevel value]"
 	}
 }

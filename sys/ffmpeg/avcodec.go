@@ -106,6 +106,24 @@ func (this *AVCodec) WrapperName() string {
 	return C.GoString(this.wrapper_name)
 }
 
+func (this *AVCodec) IsEncoder() bool {
+	ctx := (*C.AVCodec)(this)
+	if C.av_codec_is_encoder(ctx) == 0 {
+		return false
+	} else {
+		return true
+	}
+}
+
+func (this *AVCodec) IsDecoder() bool {
+	ctx := (*C.AVCodec)(this)
+	if C.av_codec_is_decoder(ctx) == 0 {
+		return false
+	} else {
+		return true
+	}
+}
+
 func (this *AVCodec) String() string {
 	str := "<AVCodec"
 	str += " name=" + strconv.Quote(this.Name())
@@ -116,6 +134,12 @@ func (this *AVCodec) String() string {
 	}
 	if wn := this.WrapperName(); wn != "" {
 		str += " wrapper_name=" + strconv.Quote(wn)
+	}
+	if encoder := this.IsEncoder(); encoder {
+		str += " encoder=true"
+	}
+	if decoder := this.IsDecoder(); decoder {
+		str += " decoder=true"
 	}
 	return str + ">"
 }
@@ -191,6 +215,16 @@ func (this *AVCodecParameters) FromContext(codecctx *AVCodecContext) error {
 func (this *AVCodecParameters) ToContext(codecctx *AVCodecContext) error {
 	ctx := (*C.AVCodecParameters)(unsafe.Pointer(this))
 	if err := AVError(C.avcodec_parameters_to_context((*C.AVCodecContext)(codecctx), ctx)); err != 0 {
+		return err
+	} else {
+		return nil
+	}
+}
+
+// From fill the parameters based on the values from the supplied codec parameters
+func (this *AVCodecParameters) From(codecpar *AVCodecParameters) error {
+	ctx := (*C.AVCodecParameters)(unsafe.Pointer(this))
+	if err := AVError(C.avcodec_parameters_copy(ctx, (*C.AVCodecParameters)(codecpar))); err != 0 {
 		return err
 	} else {
 		return nil

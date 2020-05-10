@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/djthorpe/mutablehome/sys/ffmpeg"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -30,9 +32,12 @@ var (
 var (
 	commands = []Cmd{
 		Cmd{"codecs", "List registered codecs", "", Codecs},
+		Cmd{"encoders", "List registered encoders", "", Encoders},
+		Cmd{"decoders", "List registered decoders", "", Decoders},
 		Cmd{"streams", "Display stream information", "<filename>", Streams},
 		Cmd{"metadata", "Display metadata information", "<filename>", Metadata},
 		Cmd{"artwork", "Extract artwork from file", "<filename>", Artwork},
+		Cmd{"remux", "Remultiplex a file", "<in> <out>", Remux},
 	}
 )
 
@@ -58,6 +63,14 @@ func Run() error {
 	flag.Usage = Usage
 	flag.Parse()
 
+	// Set up logging
+	ffmpeg.AVLogSetCallback(func(level ffmpeg.AVLogLevel, message string, userInfo uintptr) {
+		if *flagDebug || level == ffmpeg.AV_LOG_ERROR || level == ffmpeg.AV_LOG_FATAL || level == ffmpeg.AV_LOG_PANIC {
+			fmt.Fprintln(os.Stderr, level, message)
+		}
+	})
+
+	// Run command
 	if cmd, args := GetCommand(flag.Args()); cmd.Func != nil {
 		return cmd.Func(os.Stdout, args)
 	} else {

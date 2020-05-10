@@ -9,12 +9,33 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 // CGO
 
-//#cgo pkg-config: libavutil
-//#include <libavutil/error.h>
-//#include <libavutil/dict.h>
-//#include <libavutil/mem.h>
-//#include <libavutil/frame.h>
-//#include <stdlib.h>
+/*
+#cgo pkg-config: libavutil
+#include <libavutil/error.h>
+#include <libavutil/dict.h>
+#include <libavutil/mem.h>
+#include <libavutil/frame.h>
+#include <stdlib.h>
+
+extern void av_log_cb_(int level,const char* message,void* userInfo);
+
+void av_log_cb(void* userInfo,int level,const char* fmt,va_list args) {
+	av_log_cb_(level,"hello",userInfo);
+	//printf("log: ");
+	//vprintf(fmt,args);
+}
+void av_log_set_callback_(int def) {
+	// true if the default callback should be set
+	if (def) {
+		av_log_set_callback(av_log_default_callback);
+	} else {
+		av_log_set_callback(av_log_cb);
+	}
+}
+void av_log_(void* userInfo,int level,const char* fmt) {
+	av_log(userInfo,level,"%s",fmt);
+}
+*/
 import "C"
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -27,12 +48,14 @@ type (
 	AVDictionaryFlag  int
 )
 
+type AVLogCallback func(level AVLogLevel, message string, userInfo uintptr)
+
 type AVDictionary struct {
 	ctx *C.struct_AVDictionary
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// COMSTANTS
+// CONSTANTS
 
 const (
 	BUF_SIZE = 1024
@@ -47,6 +70,13 @@ const (
 	AV_DICT_DONT_OVERWRITE  AVDictionaryFlag = 16
 	AV_DICT_APPEND          AVDictionaryFlag = 32
 	AV_DICT_MULTIKEY        AVDictionaryFlag = 64
+)
+
+////////////////////////////////////////////////////////////////////////////////
+// VARIABLES
+
+var (
+	log_callback AVLogCallback
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -164,4 +194,29 @@ func (this *AVFrame) Free() {
 func (this *AVFrame) String() string {
 	str := "<AVFrame"
 	return str + ">"
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// LOGGING
+
+func AVLogSetCallback(cb AVLogCallback) {
+	log_callback = cb
+	if cb == nil {
+		C.av_log_set_callback_(1)
+	} else {
+		C.av_log_set_callback_(0)
+	}
+}
+
+func AVLog(level AVLogLevel, format string, args ...interface{}) {
+	value_ := C.CString(fmt.Sprintf(format, args...))
+	defer C.free(unsafe.Pointer(value_))
+	C.av_log_(nil, C.int(level), value_)
+}
+
+//export av_log_cb_
+func av_log_cb_(level int, userInfo uintptr) {
+	if log_callback != nil {
+		log_callback(level, "TODO", userInfo)
+	}
 }
