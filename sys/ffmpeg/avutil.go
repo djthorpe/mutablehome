@@ -16,24 +16,22 @@ import (
 #include <libavutil/mem.h>
 #include <libavutil/frame.h>
 #include <stdlib.h>
+#define MAX_LOG_BUFFER 1024
 
-extern void av_log_cb_(int level,const char* message,void* userInfo);
+extern void av_log_cb_(int level,char* message,void* userInfo);
 
-void av_log_cb(void* userInfo,int level,const char* fmt,va_list args) {
-	av_log_cb_(level,"hello",userInfo);
-	//printf("log: ");
-	//vprintf(fmt,args);
+static void av_log_cb(void* userInfo,int level,const char* fmt,va_list args) {
+	static char buf[MAX_LOG_BUFFER];
+	vsnprintf(buf,MAX_LOG_BUFFER,fmt,args);
+	av_log_cb_(level,buf,userInfo);
 }
-void av_log_set_callback_(int def) {
+static void av_log_set_callback_(int def) {
 	// true if the default callback should be set
 	if (def) {
 		av_log_set_callback(av_log_default_callback);
 	} else {
 		av_log_set_callback(av_log_cb);
 	}
-}
-void av_log_(void* userInfo,int level,const char* fmt) {
-	av_log(userInfo,level,"%s",fmt);
 }
 */
 import "C"
@@ -199,24 +197,28 @@ func (this *AVFrame) String() string {
 ////////////////////////////////////////////////////////////////////////////////
 // LOGGING
 
-func AVLogSetCallback(cb AVLogCallback) {
+// AVLogSetCallback sets both the callback function and the level of output
+// for logging. Where the callback is nil, the default ffmpeg logging is used.
+func AVLogSetCallback(level AVLogLevel, cb AVLogCallback) {
 	log_callback = cb
 	if cb == nil {
 		C.av_log_set_callback_(1)
 	} else {
 		C.av_log_set_callback_(0)
 	}
+	C.av_log_set_level(C.int(level))
 }
 
-func AVLog(level AVLogLevel, format string, args ...interface{}) {
-	value_ := C.CString(fmt.Sprintf(format, args...))
-	defer C.free(unsafe.Pointer(value_))
-	C.av_log_(nil, C.int(level), value_)
+func AVGetLogLevel() AVLogLevel {
+	return AVLogLevel(C.av_log_get_level())
 }
 
 //export av_log_cb_
-func av_log_cb_(level int, userInfo uintptr) {
-	if log_callback != nil {
-		log_callback(level, "TODO", userInfo)
+func av_log_cb_(level C.int, message *C.char, userInfo unsafe.Pointer) {
+	if log_callback != nil && message != nil {
+		level_ := AVLogLevel(level)
+		if level_ <= AVGetLogLevel() {
+			log_callback(level_, C.GoString(message), uintptr(userInfo))
+		}
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/djthorpe/mutablehome/sys/ffmpeg"
 )
@@ -31,9 +32,11 @@ var (
 
 var (
 	commands = []Cmd{
-		Cmd{"codecs", "List registered codecs", "", Codecs},
 		Cmd{"encoders", "List registered encoders", "", Encoders},
 		Cmd{"decoders", "List registered decoders", "", Decoders},
+		Cmd{"muxers", "List registered multiplexers", "", Muxers},
+		Cmd{"demuxers", "List registered demultiplexers", "", Demuxers},
+
 		Cmd{"streams", "Display stream information", "<filename>", Streams},
 		Cmd{"metadata", "Display metadata information", "<filename>", Metadata},
 		Cmd{"artwork", "Extract artwork from file", "<filename>", Artwork},
@@ -59,14 +62,24 @@ func GetCommand(args []string) (Cmd, []string) {
 	return Cmd{}, nil
 }
 
+func LogLevel() ffmpeg.AVLogLevel {
+	if *flagDebug {
+		return ffmpeg.AV_LOG_TRACE
+	} else {
+		return ffmpeg.AV_LOG_INFO
+	}
+}
+
 func Run() error {
 	flag.Usage = Usage
 	flag.Parse()
 
 	// Set up logging
-	ffmpeg.AVLogSetCallback(func(level ffmpeg.AVLogLevel, message string, userInfo uintptr) {
-		if *flagDebug || level == ffmpeg.AV_LOG_ERROR || level == ffmpeg.AV_LOG_FATAL || level == ffmpeg.AV_LOG_PANIC {
-			fmt.Fprintln(os.Stderr, level, message)
+	ffmpeg.AVLogSetCallback(LogLevel(), func(level ffmpeg.AVLogLevel, message string, userInfo uintptr) {
+		if level == ffmpeg.AV_LOG_INFO {
+			fmt.Fprint(os.Stderr, message)
+		} else {
+			fmt.Fprintf(os.Stderr, "[%v] %v", strings.TrimPrefix(fmt.Sprint(level), "AV_LOG_"), message)
 		}
 	})
 

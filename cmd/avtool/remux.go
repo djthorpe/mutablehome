@@ -44,7 +44,6 @@ func Remux(w io.Writer, args []string) error {
 			}
 		}
 		ctxOut.Dump(0)
-
 	}
 
 	return nil

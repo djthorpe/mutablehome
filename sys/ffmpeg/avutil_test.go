@@ -40,10 +40,9 @@ func Test_avutil_002(t *testing.T) {
 
 func Test_avutil_003(t *testing.T) {
 	// Set log callback
-	ffmpeg.AVLogSetCallback(func(level int, message string, userInfo uintptr) {
+	ffmpeg.AVLogSetCallback(0, func(level ffmpeg.AVLogLevel, message string, userInfo uintptr) {
 		t.Log("level=", level, "message=", message, "userInfo=", userInfo)
 	})
-	ffmpeg.AVLog(ffmpeg.AV_LOG_ERROR, "Error Test\n")
 	// Return to standard logging
-	ffmpeg.AVLogSetCallback(nil)
+	ffmpeg.AVLogSetCallback(0, nil)
 }

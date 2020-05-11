@@ -53,6 +53,37 @@ func AVFormatDeinit() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// GET FORMATS
+
+// AllMuxers returns all registered multiplexers
+func AllMuxers() []*AVOutputFormat {
+	muxers := make([]*AVOutputFormat, 0)
+	ptr := unsafe.Pointer(nil)
+	for {
+		if muxer := C.av_muxer_iterate(&ptr); muxer == nil {
+			break
+		} else {
+			muxers = append(muxers, (*AVOutputFormat)(muxer))
+		}
+	}
+	return muxers
+}
+
+// AllDemuxers returns all registered demultiplexers
+func AllDemuxers() []*AVInputFormat {
+	demuxers := make([]*AVInputFormat, 0)
+	ptr := unsafe.Pointer(nil)
+	for {
+		if demuxer := C.av_demuxer_iterate(&ptr); demuxer == nil {
+			break
+		} else {
+			demuxers = append(demuxers, (*AVInputFormat)(demuxer))
+		}
+	}
+	return demuxers
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // AVIO
 
 func NewAVIOContext(url *url.URL, flags AVIOFlag) (*AVIOContext, error) {
