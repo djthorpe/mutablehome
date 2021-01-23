@@ -21,18 +21,17 @@ import (
 // TYPES
 
 type (
-	Command   uint16
-	EventType uint16
-	Power     uint16
-	Volume    uint16
-	Source    uint16
-	Mute      uint16
-	Bypass    uint16
-	Tone      int16
-	Balance   int16
-	Dimmer    uint16
-	Speaker   uint16
-	Update    uint16
+	Command uint16
+	Power   uint16
+	Volume  uint16
+	Source  uint16
+	Mute    uint16
+	Bypass  uint16
+	Tone    int16
+	Balance int16
+	Dimmer  uint16
+	Speaker uint16
+	Update  uint16
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -437,6 +436,7 @@ func (u Update) String() string {
 	}
 }
 
+/*
 func (e EventType) String() string {
 	switch e {
 	case ROTEL_EVENT_TYPE_NONE:
@@ -469,6 +469,7 @@ func (e EventType) String() string {
 		return "[?? Invalid EventType value]"
 	}
 }
+*/
 
 func (c Command) String() string {
 	switch c {

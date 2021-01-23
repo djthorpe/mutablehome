@@ -10,6 +10,8 @@ package mutablehome
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
 
 	// Frameworks
 	grpc "github.com/djthorpe/gopi-rpc/v2/unit/grpc"
@@ -18,6 +20,7 @@ import (
 
 	// Protocol buffers
 	pb "github.com/djthorpe/mutablehome/protobuf/mutablehome"
+	ptypes "github.com/golang/protobuf/ptypes"
 	empty "github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -30,7 +33,11 @@ type NodeService struct {
 
 type nodeservice struct {
 	base.Unit
+	sync.Mutex
+	nodedevices
+
 	server gopi.RPCServer
+	start  time.Time
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -43,6 +50,8 @@ func (config NodeService) New(log gopi.Logger) (gopi.Unit, error) {
 	if err := this.Unit.Init(log); err != nil {
 		return nil, err
 	} else if err := this.Init(config); err != nil {
+		return nil, err
+	} else if err := this.nodedevices.Init(log); err != nil {
 		return nil, err
 	}
 
@@ -61,11 +70,24 @@ func (this *nodeservice) Init(config NodeService) error {
 	// Register with server
 	pb.RegisterNodeServer(this.server.(grpc.GRPCServer).GRPCServer(), this)
 
+	// Set start time
+	this.start = time.Now()
+
 	// Success
 	return nil
 }
 
 func (this *nodeservice) Close() error {
+	this.Mutex.Lock()
+	defer this.Mutex.Unlock()
+
+	if err := this.nodedevices.Close(); err != nil {
+		return err
+	}
+
+	// Release resources
+	this.server = nil
+
 	return this.Unit.Close()
 }
 
@@ -73,7 +95,7 @@ func (this *nodeservice) Close() error {
 // STRINGIFY
 
 func (this *nodeservice) String() string {
-	return "<" + this.Log.Name() + " " + fmt.Sprint(this.server) + ">"
+	return "<" + this.Unit.Log.Name() + " " + fmt.Sprint(this.server) + " node=" + fmt.Sprint(this.node) + ">"
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -88,5 +110,25 @@ func (this *nodeservice) CancelRequests() error {
 // IMPLEMENTATION
 
 func (this *nodeservice) Ping(context.Context, *empty.Empty) (*empty.Empty, error) {
+	this.Unit.Log.Debug("<Ping>")
+
 	return &empty.Empty{}, nil
+}
+
+func (this *nodeservice) Metadata(context.Context, *empty.Empty) (*pb.MetadataResponse, error) {
+	this.Unit.Log.Debug("<Metadata>")
+	this.Mutex.Lock()
+	defer this.Mutex.Unlock()
+
+	// Check to make sure node is set
+	if this.node == nil {
+		return nil, gopi.ErrInternalAppError.WithPrefix("Missing node parameter")
+	}
+
+	// Return metadata information
+	return &pb.MetadataResponse{
+		Id:     this.node.Id(),
+		Name:   this.node.Name(),
+		Uptime: ptypes.DurationProto(time.Now().Sub(this.start)),
+	}, nil
 }

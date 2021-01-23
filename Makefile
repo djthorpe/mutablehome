@@ -10,7 +10,7 @@ GOLDFLAGS += -X $(GOPI).GoBuildTime=$(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 GOFLAGS = -ldflags "-s -w $(GOLDFLAGS)" 
 
 all:
-	@echo "Synax: make protogen|ecovacs|tradfri|clean"
+	@echo "Synax: make protogen|ecovacs|tradfri|mutablehome|clean"
 
 protogen:
 	@echo Compiling protocol buffers
@@ -28,9 +28,17 @@ tradfri: protogen
 	@$(GO) build -o /opt/gaffer/bin/tradfri $(GOFLAGS) ./cmd/tradfri
 	@$(GO) build -o /opt/gaffer/sbin/tradfri-service $(GOFLAGS) ./cmd/tradfri-service
 
+mutablehome: protogen
+	@echo Installing mutablehome to /opt/gaffer
+	@install -d /opt/gaffer/bin
+	@$(GO) build -o /opt/gaffer/bin/mutablehome $(GOFLAGS) ./cmd/mutablehome-client
+
 googlecast:
 	$(GOGEN) ./grpc
 	$(GOINSTALL) $(GOFLAGS) ./cmd/googlecast
+
+avtool:
+	$(GOINSTALL) ./cmd/avtool
 
 httpd:
 	$(GOINSTALL) $(GOFLAGS) ./cmd/httpd

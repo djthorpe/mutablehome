@@ -12,9 +12,20 @@ option go_package = "github.com/djthorpe/mutablehome/protobuf/mutablehome";
 
 // Import dependencies
 import "google/protobuf/empty.proto";
+import "google/protobuf/duration.proto";
 
 // The Node service definition
 service Node {
   // Simple ping method to show server is "up"
   rpc Ping (google.protobuf.Empty) returns (google.protobuf.Empty);
+
+  // Return metadata for the node
+  rpc Metadata (google.protobuf.Empty) returns (MetadataResponse);
+}
+
+// Metadata message
+message MetadataResponse {
+    string id = 1;                        // Unique ID for the node
+    string name = 2;                      // Name for the node
+    google.protobuf.Duration uptime = 3;  // How long the node has been running for
 }
